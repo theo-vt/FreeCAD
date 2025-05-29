@@ -1445,6 +1445,7 @@ void PropertyString::setValue(const char* newValue)
     auto obj = freecad_cast<DocumentObject*>(getContainer());
     bool commit = false;
 
+    // Changing the label of a document object
     if (obj && this == &obj->Label) {
         propChanges = obj->onProposedLabelChange(newValueStr);
         if (_cValue == newValueStr) {

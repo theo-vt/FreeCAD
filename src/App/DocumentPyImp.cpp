@@ -595,6 +595,14 @@ PyObject* DocumentPy::commitTransaction(PyObject* args)
     getDocumentPtr()->commitTransaction();
     Py_Return;
 }
+PyObject*  DocumentPy::getCurrentTransactionID(PyObject *args)
+{
+    if (!PyArg_ParseTuple(args, "")) {
+        return nullptr;
+    }
+
+    return Py::new_reference_to(Py::Int(getDocumentPtr()->getCurrentTransactionID()));
+}
 
 Py::Boolean DocumentPy::getHasPendingTransaction() const
 {

@@ -558,6 +558,13 @@ int Document::getTransactionID(const bool undo, unsigned pos) const
     for (; pos != 0U; ++rit, --pos) {}
     return (*rit)->getID();
 }
+int Document::getCurrentTransactionID() const
+{
+    if (d->activeUndoTransaction) {
+        return d->activeUndoTransaction->getID();
+    }
+    return 0;
+}
 
 bool Document::isTransactionEmpty() const
 {

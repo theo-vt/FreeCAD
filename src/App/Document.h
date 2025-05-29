@@ -488,6 +488,7 @@ public:
     bool hasPendingTransaction() const;
     /// Return the undo/redo transaction ID starting from the back
     int getTransactionID(bool undo, unsigned pos = 0) const;
+    int getCurrentTransactionID() const;
     /// Check if a transaction is open and its list is empty.
     /// If no transaction is open true is returned.
     bool isTransactionEmpty() const;

@@ -179,6 +179,12 @@ class Document(PropertyContainer):
         """
         ...
 
+    def getCurrentTransactionID(self) -> int:
+        """
+        Gets the current transaction id
+        """
+        ...
+
     def addObject(
         self,
         *,

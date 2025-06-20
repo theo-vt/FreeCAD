@@ -1562,12 +1562,12 @@ StdCmdTransform::StdCmdTransform()
 void StdCmdTransform::activated(int iMsg)
 {
     Q_UNUSED(iMsg);
-    Gui::Control().showDialog(new Gui::Dialog::TaskTransform());
+    Gui::Control().showDialog(new Gui::Dialog::TaskTransform(), getDocument());
 }
 
 bool StdCmdTransform::isActive()
 {
-    return (Gui::Control().activeDialog() == nullptr);
+    return (Gui::Control().activeDialog(getDocument()) == nullptr);
 }
 
 //===========================================================================
@@ -1610,7 +1610,7 @@ void StdCmdPlacement::activated(int iMsg)
             plm->clearSelection();
         }
     }
-    Gui::Control().showDialog(plm);
+    Gui::Control().showDialog(plm, getDocument());
 }
 
 bool StdCmdPlacement::isActive()
@@ -1762,7 +1762,7 @@ void StdCmdEdit::activated(int iMsg)
 
 bool StdCmdEdit::isActive()
 {
-    return (!Selection().getCompleteSelection().empty()) || (Gui::Control().activeDialog() != nullptr);
+    return (!Selection().getCompleteSelection().empty()) || (Gui::Control().activeDialog(getDocument()) != nullptr);
 }
 
 //===========================================================================

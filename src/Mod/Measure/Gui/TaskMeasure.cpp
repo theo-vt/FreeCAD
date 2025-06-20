@@ -358,7 +358,7 @@ void TaskMeasure::initViewObject()
 
 void TaskMeasure::close()
 {
-    Control().closeDialog();
+    Control().closeDialog(nullptr);
 }
 
 

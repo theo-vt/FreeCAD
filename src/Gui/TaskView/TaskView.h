@@ -25,7 +25,9 @@
 #define GUI_TASKVIEW_TASKVIEW_H
 
 #include <vector>
+#include <optional>
 #include <QScrollArea>
+#include <QStackedWidget>
 
 #include <Gui/QSint/include/QSint>
 #include <Gui/Selection/Selection.h>
@@ -133,6 +135,13 @@ public:
     ~TaskWidget() override;
 };
 
+struct TaskInfo {
+    QSint::ActionPanel* taskPanel { nullptr };
+    TaskDialog *ActiveDialog { nullptr };
+    TaskEditControl *ActiveCtrl { nullptr };
+    App::Document* Document {nullptr};
+};
+
 /** TaskView class
   * handles the FreeCAD task view panel. Keeps track of the inserted content elements.
   * This elements get injected mostly by the ViewProvider classes of the selected
@@ -168,14 +177,18 @@ public:
     void setRestoreWidth(bool on);
     bool shouldRestoreWidth() const;
 
+    std::optional<TaskInfo> currentTaskInfo() const;
+
+    TaskDialog* dialog(App::Document* doc);
+
 Q_SIGNALS:
     void taskUpdate();
 
-protected Q_SLOTS:
-    void accept();
-    void reject();
-    void helpRequested();
-    void clicked (QAbstractButton * button);
+protected:
+    void accept(App::Document* doc);
+    void reject(App::Document* doc);
+    void helpRequested(App::Document* doc);
+    void clicked (QAbstractButton * button, App::Document* doc);
 
 private:
     void triggerMinimumSizeHint();
@@ -189,6 +202,8 @@ private:
     void slotRedoDocument(const App::Document&);
     void transactionChangeOnDocument(const App::Document&, bool undo);
 
+    QSint::ActionPanel* makeTaskPanel();
+
 protected:
     void keyPressEvent(QKeyEvent* event) override;
     bool event(QEvent* event) override;
@@ -197,16 +212,22 @@ protected:
     void removeTaskWatcher();
     /// update the visibility of the TaskWatcher accordant to the selection
     void updateWatcher();
-    /// used by Gui::Control to register Dialogs
-    void showDialog(TaskDialog *dlg);
+    /// used by Gui::Control to register Dialogs, returns true if the dialog was not already there
+    bool showDialog(TaskDialog *dlg, App::Document* doc);
     // removes the running dialog after accept() or reject() from the TaskView
-    void removeDialog();
+    void removeDialog(App::Document* doc);
+    void removeDialog(std::vector<TaskInfo>::iterator infoIt);
 
     std::vector<TaskWatcher*> ActiveWatcher;
+    QSint::ActionPanel* TaskWatcherPanel;
 
-    QSint::ActionPanel* taskPanel;
-    TaskDialog *ActiveDialog;
-    TaskEditControl *ActiveCtrl;
+    // QSint::ActionPanel* taskPanel;
+    // TaskDialog *ActiveDialog;
+    // TaskEditControl *ActiveCtrl;
+
+    // First index of the stack is reserved to the active watcher
+    QStackedWidget taskStack;
+    std::vector<TaskInfo> taskInfos;
     bool restoreWidth = false;
     int currentWidth = 0;
 

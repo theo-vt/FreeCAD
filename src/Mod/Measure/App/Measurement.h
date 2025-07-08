@@ -119,7 +119,6 @@ public:
 
     bool planesAreParallel() const;
     bool linesAreParallel() const;
-    bool cylindersAreParallel() const;
     bool circleAndCylinderAreParallel() const;
 
 protected:

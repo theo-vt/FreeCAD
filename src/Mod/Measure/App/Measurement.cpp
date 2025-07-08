@@ -29,6 +29,7 @@
 #include <GeomAPI_ExtremaCurveCurve.hxx>
 #include <BRepGProp.hxx>
 #include <GCPnts_AbscissaPoint.hxx>
+#include <Geom_Line.hxx>
 #include <gp_Pln.hxx>
 #include <gp_Circ.hxx>
 #include <gp_Torus.hxx>
@@ -205,7 +206,7 @@ MeasureType Measurement::findType()
             if (faces == 1 && verts == 1) {
                 mode = MeasureType::PointToSurface;
             }
-            else if (cylinders == 1 && circles == 1 && circleAndCylinderAreParallel()) {
+            else if (cylinders == 1 && circles == 1) {
                 mode = MeasureType::CircleCylinder;
             }
             else {
@@ -228,12 +229,7 @@ MeasureType Measurement::findType()
                 mode = MeasureType::Cylinder;
             }
             else if (cylinders == 2 && faces == 2) {
-                if (cylindersAreParallel()) {
-                    mode = MeasureType::TwoCylinders;
-                }
-                else {
-                    mode = MeasureType::Surfaces;
-                }
+                mode = MeasureType::TwoCylinders;
             }
             else if (cones == 1 && faces == 1) {
                 mode = MeasureType::Cone;
@@ -381,10 +377,10 @@ double Measurement::length() const
     return result;
 }
 
-double lineLineDistanceHelper(gp_Pnt p1, gp_Pnt p2, gp_Dir lineDir)
+double pointLineDistanceHelper(gp_Pnt p1, gp_Pnt linePoint, gp_Dir lineDir)
 {
     // Create a vector from a point on line1 to a point on line2
-    gp_Vec lineVec(p1, p2);
+    gp_Vec lineVec(p1, linePoint);
 
     // Project lineVec onto lineDir
     gp_Vec parallelComponent = lineVec.Dot(lineDir) * lineDir;
@@ -428,7 +424,7 @@ double Measurement::lineLineDistance() const
         // The direction vector of one of the lines
         gp_Dir lineDir = line1.Direction();
 
-        distance = lineLineDistanceHelper(p1, p2, lineDir);
+        distance = pointLineDistanceHelper(p1, p2, lineDir);
     }
     else {
         Base::Console().error("Measurement::length - TwoLines measureType requires two lines\n");
@@ -531,9 +527,10 @@ double Measurement::cylinderCylinderDistance() const
         gp_Cylinder cylinder1 = surface1.Cylinder();
         gp_Cylinder cylinder2 = surface2.Cylinder();
 
-        distance = lineLineDistanceHelper(cylinder1.Location(),
-                                          cylinder2.Location(),
-                                          cylinder1.Axis().Direction());
+        Handle(Geom_Curve) axis1(new Geom_Line(cylinder1.Axis()));
+        Handle(Geom_Curve) axis2(new Geom_Line(cylinder2.Axis()));
+
+        distance = GeomAPI_ExtremaCurveCurve(axis1, axis2).LowerDistance();
     }
     else {
         Base::Console().error("Measurement::cylinderCylinderDistance - TwoCylinders measureType "
@@ -571,9 +568,9 @@ double Measurement::circleCylinderDistance() const
         gp_Cylinder cylinder = surface.Cylinder();
         gp_Circ circle = curve.Circle();
 
-        distance = lineLineDistanceHelper(circle.Location(),
-                                          cylinder.Location(),
-                                          cylinder.Axis().Direction());
+        distance = pointLineDistanceHelper(circle.Location(),
+                                           cylinder.Location(),
+                                           cylinder.Axis().Direction());
     }
     else {
         Base::Console().error("Measurement::CircleCylinderDistance - CircleCylinder measureType "
@@ -947,40 +944,6 @@ bool Measurement::linesAreParallel() const
 
         gp_Dir dir1 = line1.Direction();
         gp_Dir dir2 = line2.Direction();
-
-        // Check if lines are parallel
-        if (dir1.IsParallel(dir2, Precision::Angular())) {
-            return true;
-        }
-    }
-
-    return false;
-}
-bool Measurement::cylindersAreParallel() const
-{
-    const std::vector<App::DocumentObject*>& objects = References3D.getValues();
-    const std::vector<std::string>& subElements = References3D.getSubValues();
-
-    if (References3D.getSize() != 2) {
-        return false;
-    }
-
-    // Get the first cylinder
-    TopoDS_Shape shape1 = getShape(objects[0], subElements[0].c_str());
-    const TopoDS_Face& face1 = TopoDS::Face(shape1);
-    BRepAdaptor_Surface surface1(face1);
-
-    // Get the second cylinder
-    TopoDS_Shape shape2 = getShape(objects[1], subElements[1].c_str());
-    const TopoDS_Face& face2 = TopoDS::Face(shape2);
-    BRepAdaptor_Surface surface2(face2);
-
-    if (surface1.GetType() == GeomAbs_Cylinder && surface2.GetType() == GeomAbs_Cylinder) {
-        gp_Cylinder cylinder1 = surface1.Cylinder();
-        gp_Cylinder cylinder2 = surface2.Cylinder();
-
-        gp_Dir dir1 = cylinder1.Axis().Direction();
-        gp_Dir dir2 = cylinder2.Axis().Direction();
 
         // Check if lines are parallel
         if (dir1.IsParallel(dir2, Precision::Angular())) {

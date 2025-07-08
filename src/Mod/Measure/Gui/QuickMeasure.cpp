@@ -251,12 +251,12 @@ void QuickMeasure::printResult()
                        lengthStr(measurement->length())));
     }
     else if (mtype == MeasureType::TwoCylinders) {
-        print(tr("Centers distance: %1, Area: %2")
+        print(tr("Axis distance: %1, Area: %2")
                   .arg(lengthStr(measurement->cylinderCylinderDistance()),
                        areaStr(measurement->area())));
     }
     else if (mtype == MeasureType::CircleCylinder) {
-        print(tr("Centers distance: %1").arg(measurement->circleCylinderDistance()));
+        print(tr("Center axis distance: %1").arg(measurement->circleCylinderDistance()));
     }
     else {
         print(QStringLiteral(""));

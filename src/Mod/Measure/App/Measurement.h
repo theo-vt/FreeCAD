@@ -44,13 +44,16 @@ enum class MeasureType
     TwoLines,          // Two lines
     TwoParallelLines,  // Two parallel lines
     Circle,            // One circle
-    Surfaces,          // Measure the surface(s)
-    Cylinder,          // One Cylinder
-    Cone,              // One Cone
-    Sphere,            // One Sphere
-    Torus,             // One Torus
-    Plane,             // One Plane
-    TwoPlanes,         // One Plane
+    TwoCircles,
+    Surfaces,  // Measure the surface(s)
+    Cylinder,  // One Cylinder
+    TwoCylinders,
+    CircleCylinder,
+    Cone,       // One Cone
+    Sphere,     // One Sphere
+    Torus,      // One Torus
+    Plane,      // One Plane
+    TwoPlanes,  // One Plane
     Points,
     PointToPoint,    // Measure between TWO points
     PointToEdge,     // Measure between ONE point and ONE edge
@@ -89,6 +92,9 @@ public:
     Base::Vector3d delta() const;  // when would client use delta??
     double lineLineDistance() const;
     double planePlaneDistance() const;
+    double circleCircleDistance() const;
+    double cylinderCylinderDistance() const;
+    double circleCylinderDistance() const;
 
     // Calculates the radius for an arc or circular edge
     double radius() const;
@@ -113,6 +119,8 @@ public:
 
     bool planesAreParallel() const;
     bool linesAreParallel() const;
+    bool cylindersAreParallel() const;
+    bool circleAndCylinderAreParallel() const;
 
 protected:
     TopoDS_Shape getShape(App::DocumentObject* obj, const char* subName) const;

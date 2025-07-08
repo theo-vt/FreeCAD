@@ -26,6 +26,7 @@
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
+#include <GeomAPI_ExtremaCurveCurve.hxx>
 #include <BRepGProp.hxx>
 #include <GCPnts_AbscissaPoint.hxx>
 #include <gp_Pln.hxx>
@@ -204,6 +205,9 @@ MeasureType Measurement::findType()
             if (faces == 1 && verts == 1) {
                 mode = MeasureType::PointToSurface;
             }
+            else if (cylinders == 1 && circles == 1 && circleAndCylinderAreParallel()) {
+                mode = MeasureType::CircleCylinder;
+            }
             else {
                 mode = MeasureType::Invalid;
             }
@@ -222,6 +226,14 @@ MeasureType Measurement::findType()
             }
             else if (cylinders == 1 && faces == 1) {
                 mode = MeasureType::Cylinder;
+            }
+            else if (cylinders == 2 && faces == 2) {
+                if (cylindersAreParallel()) {
+                    mode = MeasureType::TwoCylinders;
+                }
+                else {
+                    mode = MeasureType::Surfaces;
+                }
             }
             else if (cones == 1 && faces == 1) {
                 mode = MeasureType::Cone;
@@ -259,6 +271,9 @@ MeasureType Measurement::findType()
         }
         else if (circles == 1 && edges == 1) {
             mode = MeasureType::Circle;
+        }
+        else if (circles == 2 && edges == 2) {
+            mode = MeasureType::TwoCircles;
         }
         else {
             mode = MeasureType::Edges;
@@ -314,7 +329,8 @@ double Measurement::length() const
             result = diff.Length();
         }
         else if (measureType == MeasureType::Edges || measureType == MeasureType::Line
-                 || measureType == MeasureType::TwoLines || measureType == MeasureType::Circle) {
+                 || measureType == MeasureType::TwoLines || measureType == MeasureType::Circle
+                 || measureType == MeasureType::TwoCircles) {
 
             // Iterate through edges and calculate each length
             std::vector<App::DocumentObject*>::const_iterator obj = objects.begin();
@@ -365,6 +381,20 @@ double Measurement::length() const
     return result;
 }
 
+double lineLineDistanceHelper(gp_Pnt p1, gp_Pnt p2, gp_Dir lineDir)
+{
+    // Create a vector from a point on line1 to a point on line2
+    gp_Vec lineVec(p1, p2);
+
+    // Project lineVec onto lineDir
+    gp_Vec parallelComponent = lineVec.Dot(lineDir) * lineDir;
+
+    // Compute the perpendicular component
+    gp_Vec perpendicularComponent = lineVec - parallelComponent;
+
+    // Distance is the magnitude of the perpendicular component
+    return perpendicularComponent.Magnitude();
+}
 double Measurement::lineLineDistance() const
 {
     // We don't use delta() because BRepExtrema_DistShapeShape return minimum length between line
@@ -395,20 +425,10 @@ double Measurement::lineLineDistance() const
         gp_Pnt p1 = line1.Location();
         gp_Pnt p2 = line2.Location();
 
-        // Create a vector from a point on line1 to a point on line2
-        gp_Vec lineVec(p1, p2);
-
         // The direction vector of one of the lines
         gp_Dir lineDir = line1.Direction();
 
-        // Project lineVec onto lineDir
-        gp_Vec parallelComponent = lineVec.Dot(lineDir) * lineDir;
-
-        // Compute the perpendicular component
-        gp_Vec perpendicularComponent = lineVec - parallelComponent;
-
-        // Distance is the magnitude of the perpendicular component
-        distance = perpendicularComponent.Magnitude();
+        distance = lineLineDistanceHelper(p1, p2, lineDir);
     }
     else {
         Base::Console().error("Measurement::length - TwoLines measureType requires two lines\n");
@@ -453,7 +473,114 @@ double Measurement::planePlaneDistance() const
 
     return distance;
 }
+double Measurement::circleCircleDistance() const
+{
+    double distance = 0.0;
 
+    if (measureType != MeasureType::TwoCircles || References3D.getSize() != 2) {
+        return distance;
+    }
+
+    const std::vector<App::DocumentObject*>& objects = References3D.getValues();
+    const std::vector<std::string>& subElements = References3D.getSubValues();
+
+    // Get the first circle
+    TopoDS_Shape shape1 = getShape(objects[0], subElements[0].c_str());
+    const TopoDS_Edge& edge1 = TopoDS::Edge(shape1);
+    BRepAdaptor_Curve curve1(edge1);
+
+    // Get the second circle
+    TopoDS_Shape shape2 = getShape(objects[1], subElements[1].c_str());
+    const TopoDS_Edge& edge2 = TopoDS::Edge(shape2);
+    BRepAdaptor_Curve curve2(edge2);
+
+    if (curve1.GetType() == GeomAbs_Circle && curve2.GetType() == GeomAbs_Circle) {
+        gp_Circ circle1 = curve1.Circle();
+        gp_Circ circle2 = curve2.Circle();
+
+        distance = circle1.Location().Distance(circle2.Location());
+    }
+    else {
+        Base::Console().error(
+            "Measurement::circleCircleDistance - TwoCircles measureType requires two circles\n");
+    }
+    return distance;
+}
+double Measurement::cylinderCylinderDistance() const
+{
+    double distance = 0.0;
+
+    if (measureType != MeasureType::TwoCylinders || References3D.getSize() != 2) {
+        return distance;
+    }
+
+    const std::vector<App::DocumentObject*>& objects = References3D.getValues();
+    const std::vector<std::string>& subElements = References3D.getSubValues();
+
+    // Get the first cylinder
+    TopoDS_Shape shape1 = getShape(objects[0], subElements[0].c_str());
+    const TopoDS_Face& face1 = TopoDS::Face(shape1);
+    BRepAdaptor_Surface surface1(face1);
+
+    // Get the second cylinder
+    TopoDS_Shape shape2 = getShape(objects[1], subElements[1].c_str());
+    const TopoDS_Face& face2 = TopoDS::Face(shape2);
+    BRepAdaptor_Surface surface2(face2);
+
+    if (surface1.GetType() == GeomAbs_Cylinder && surface2.GetType() == GeomAbs_Cylinder) {
+        gp_Cylinder cylinder1 = surface1.Cylinder();
+        gp_Cylinder cylinder2 = surface2.Cylinder();
+
+        distance = lineLineDistanceHelper(cylinder1.Location(),
+                                          cylinder2.Location(),
+                                          cylinder1.Axis().Direction());
+    }
+    else {
+        Base::Console().error("Measurement::cylinderCylinderDistance - TwoCylinders measureType "
+                              "requires two cylinders\n");
+    }
+    return distance;
+}
+double Measurement::circleCylinderDistance() const
+{
+    double distance = 0.0;
+
+    const std::vector<App::DocumentObject*>& objects = References3D.getValues();
+    const std::vector<std::string>& subElements = References3D.getSubValues();
+
+    if (References3D.getSize() != 2) {
+        return distance;
+    }
+
+    TopoDS_Shape shape1 = getShape(objects[0], subElements[0].c_str());
+    TopoDS_Shape shape2 = getShape(objects[1], subElements[1].c_str());
+
+    if (shape1.ShapeType() != TopAbs_FACE) {
+        std::swap(shape1, shape2);  // Expect the first shape to be the cylinder
+    }
+
+    // Get the cylinder
+    const TopoDS_Face& face = TopoDS::Face(shape1);
+    BRepAdaptor_Surface surface(face);
+
+    // Get the circle
+    const TopoDS_Edge& edge = TopoDS::Edge(shape2);
+    BRepAdaptor_Curve curve(edge);
+
+    if (surface.GetType() == GeomAbs_Cylinder && curve.GetType() == GeomAbs_Circle) {
+        gp_Cylinder cylinder = surface.Cylinder();
+        gp_Circ circle = curve.Circle();
+
+        distance = lineLineDistanceHelper(circle.Location(),
+                                          cylinder.Location(),
+                                          cylinder.Axis().Direction());
+    }
+    else {
+        Base::Console().error("Measurement::CircleCylinderDistance - CircleCylinder measureType "
+                              "requires a circle and a cylinder\n");
+    }
+    return distance;
+}
 double Measurement::angle(const Base::Vector3d& /*param*/) const
 {
     // TODO: do these references arrive as obj+sub pairs or as a struct of obj + [subs]?
@@ -688,7 +815,7 @@ double Measurement::area() const
     else if (measureType == MeasureType::Volumes || measureType == MeasureType::Surfaces
              || measureType == MeasureType::Cylinder || measureType == MeasureType::Cone
              || measureType == MeasureType::Sphere || measureType == MeasureType::Torus
-             || measureType == MeasureType::Plane) {
+             || measureType == MeasureType::Plane || measureType == MeasureType::TwoCylinders) {
 
         const std::vector<App::DocumentObject*>& objects = References3D.getValues();
         const std::vector<std::string>& subElements = References3D.getSubValues();
@@ -820,6 +947,79 @@ bool Measurement::linesAreParallel() const
 
         gp_Dir dir1 = line1.Direction();
         gp_Dir dir2 = line2.Direction();
+
+        // Check if lines are parallel
+        if (dir1.IsParallel(dir2, Precision::Angular())) {
+            return true;
+        }
+    }
+
+    return false;
+}
+bool Measurement::cylindersAreParallel() const
+{
+    const std::vector<App::DocumentObject*>& objects = References3D.getValues();
+    const std::vector<std::string>& subElements = References3D.getSubValues();
+
+    if (References3D.getSize() != 2) {
+        return false;
+    }
+
+    // Get the first cylinder
+    TopoDS_Shape shape1 = getShape(objects[0], subElements[0].c_str());
+    const TopoDS_Face& face1 = TopoDS::Face(shape1);
+    BRepAdaptor_Surface surface1(face1);
+
+    // Get the second cylinder
+    TopoDS_Shape shape2 = getShape(objects[1], subElements[1].c_str());
+    const TopoDS_Face& face2 = TopoDS::Face(shape2);
+    BRepAdaptor_Surface surface2(face2);
+
+    if (surface1.GetType() == GeomAbs_Cylinder && surface2.GetType() == GeomAbs_Cylinder) {
+        gp_Cylinder cylinder1 = surface1.Cylinder();
+        gp_Cylinder cylinder2 = surface2.Cylinder();
+
+        gp_Dir dir1 = cylinder1.Axis().Direction();
+        gp_Dir dir2 = cylinder2.Axis().Direction();
+
+        // Check if lines are parallel
+        if (dir1.IsParallel(dir2, Precision::Angular())) {
+            return true;
+        }
+    }
+
+    return false;
+}
+bool Measurement::circleAndCylinderAreParallel() const
+{
+    const std::vector<App::DocumentObject*>& objects = References3D.getValues();
+    const std::vector<std::string>& subElements = References3D.getSubValues();
+
+    if (References3D.getSize() != 2) {
+        return false;
+    }
+
+    TopoDS_Shape shape1 = getShape(objects[0], subElements[0].c_str());
+    TopoDS_Shape shape2 = getShape(objects[1], subElements[1].c_str());
+
+    if (shape1.ShapeType() != TopAbs_FACE) {
+        std::swap(shape1, shape2);  // Expect the first shape to be the cylinder
+    }
+
+    // Get the cylinder
+    const TopoDS_Face& face = TopoDS::Face(shape1);
+    BRepAdaptor_Surface surface(face);
+
+    // Get the circle
+    const TopoDS_Edge& edge = TopoDS::Edge(shape2);
+    BRepAdaptor_Curve curve(edge);
+
+    if (surface.GetType() == GeomAbs_Cylinder && curve.GetType() == GeomAbs_Circle) {
+        gp_Cylinder cylinder = surface.Cylinder();
+        gp_Circ circle = curve.Circle();
+
+        gp_Dir dir1 = cylinder.Axis().Direction();
+        gp_Dir dir2 = circle.Axis().Direction();
 
         // Check if lines are parallel
         if (dir1.IsParallel(dir2, Precision::Angular())) {

@@ -638,6 +638,14 @@ bool TaskDlgTransformedParameters::reject()
     parameter->exitSelectionMode();
     return TaskDlgFeatureParameters::reject();
 }
+void TaskDlgTransformedParameters::activate()
+{
+    parameter->attachSelection();
+}
+void TaskDlgTransformedParameters::deactivate()
+{
+    parameter->detachSelection();
+}
 
 
 #include "moc_TaskTransformedParameters.cpp"

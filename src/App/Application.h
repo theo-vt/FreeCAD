@@ -85,7 +85,6 @@ struct TransactionDescription {
     Document* initiator { nullptr };
     std::string name { "" };
     bool tmp { false };
-    int numTokens { 0 }; // This must be 0 for the command to accept a commit 
 };
 
 
@@ -224,13 +223,6 @@ public:
     std::optional<TransactionDescription> transactionDescription(int tid) const;
     void setTransactionDescription(int tid, const TransactionDescription& desc);
     void setTransactionName(int tid, const std::string& name, bool tmp = false);
-    
-    // increases the token number on the transaction
-    void takeToken(int tid);
-
-    // Decreases the token number on the transaction
-    // and commits if it reaches 0
-    void returnToken(int tid);
 
     /** Commit/abort current active transactions
      *

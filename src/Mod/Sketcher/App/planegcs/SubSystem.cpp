@@ -116,7 +116,6 @@ void SubSystem::initialize(VEC_pD& params, MAP_pD_pD& reductionmap)
         pmap[itr->first] = &pvals[itr->second];
     }
 
-    c2p.clear();
     p2c.clear();
     for (std::vector<Constraint*>::iterator constr = clist.begin(); constr != clist.end();
          ++constr) {
@@ -132,7 +131,6 @@ void SubSystem::initialize(VEC_pD& params, MAP_pD_pD& reductionmap)
         }
         for (SET_pD::const_iterator p = constr_params.begin(); p != constr_params.end(); ++p) {
             //            jacobi.set(*constr, *p, 0.);
-            c2p[*constr].push_back(*p);
             p2c[*p].push_back(*constr);
         }
         //        (*constr)->redirectParams(pmap); // redirect parameters to pvec

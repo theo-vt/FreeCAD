@@ -54,6 +54,7 @@
 
 #include "GCS.h"
 #include "qp_eq.h"
+#include "Decomposition.h"
 
 // NOTE: In CMakeList.txt -DEIGEN_NO_DEBUG is set (it does not work with a define here), to solve
 // this: this is needed to fix this SparseQR crash
@@ -1844,33 +1845,12 @@ void System::initSolution(Algorithm alg)
     }
 
     // partitioning into decoupled components
-    Graph g;
-    for (int i = 0; i < int(plist.size() + clistR.size()); i++) {
-        boost::add_vertex(g);
-    }
-
-    int cvtid = int(plist.size());
-    for (const auto constr : clistR) {
-        VEC_pD& cparams = c2p[constr];
-        for (const auto param : cparams) {
-            MAP_pD_I::const_iterator it = pIndex.find(param);
-            if (it != pIndex.end()) {
-                boost::add_edge(cvtid, it->second, g);
-            }
-        }
-        ++cvtid;
-    }
-
-    VEC_I components(boost::num_vertices(g));
-    int componentsSize = 0;
-    if (!components.empty()) {
-        componentsSize = boost::connected_components(g, &components[0]);
-    }
+    SystemDecomposition decomp(plist, clistR, c2p, pIndex);
 
     // identification of equality constraints and parameter reduction
     std::set<Constraint*> reducedConstrs;  // constraints that will be eliminated through reduction
     reductionmaps.clear();                 // destroy any maps
-    reductionmaps.resize(componentsSize);  // create empty maps to be filled in
+    reductionmaps.resize(decomp.size());   // create empty maps to be filled in
     {
         VEC_pD reducedParams = plist;
 
@@ -1890,32 +1870,14 @@ void System::initSolution(Algorithm alg)
         }
         for (size_t i = 0; i < plist.size(); ++i) {
             if (plist[i] != reducedParams[i]) {
-                int cid = components[i];
+                int cid = decomp.parameterComponent[i];
                 reductionmaps[cid][plist[i]] = reducedParams[i];
             }
         }
     }
 
-    // TODO: Why are the later (constraint-related) items added first?
-    // Adding plist-related items first would simplify assignment of `i`, but is not a big expense
-    // overall. Leaving as is to avoid any unintended consequences.
-    clists.clear();                 // destroy any lists
-    clists.resize(componentsSize);  // create empty lists to be filled in
-    size_t i = plist.size();
-    for (const auto& constr : clistR) {
-        if (reducedConstrs.count(constr) == 0) {
-            int cid = components[i];
-            clists[cid].push_back(constr);
-        }
-        ++i;
-    }
-
-    plists.clear();                 // destroy any lists
-    plists.resize(componentsSize);  // create empty lists to be filled in
-    for (size_t i = 0; i < plist.size(); ++i) {
-        int cid = components[i];
-        plists[cid].push_back(plist[i]);
-    }
+    clists = decomp.makeClists(clistR, reducedConstrs);
+    plists = decomp.makePlists(plist);
 
     // calculates subSystems and subSystemsAux from clists, plists and reductionmaps
     clearSubSystems();
@@ -1937,6 +1899,7 @@ void System::initSolution(Algorithm alg)
             subSystemsAux[cid] = new SubSystem(clist1, plists[cid], reductionmaps[cid]);
         }
     }
+    std::cerr << "Subsystems: " << subSystems.size() << "\n";
 
     isInit = true;
 }

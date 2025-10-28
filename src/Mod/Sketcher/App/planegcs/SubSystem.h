@@ -43,7 +43,6 @@ private:
     MAP_pD_pD pmap;  // redirection map from the original parameters to pvals
     VEC_D pvals;     // current variables vector (psize)
                      //        JacobianMatrix jacobi;  // jacobi matrix of the residuals
-    std::map<Constraint*, VEC_pD> c2p;                // constraint to parameter adjacency list
     std::map<double*, std::vector<Constraint*>> p2c;  // parameter to constraint adjacency list
     void initialize(VEC_pD& params, MAP_pD_pD& reductionmap);  // called by the constructors
 public:

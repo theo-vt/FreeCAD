@@ -34,8 +34,17 @@
 #include <unordered_set>
 #include <iostream>
 
+// #define USE_STRONGLY_CONNECTED_COMPONENTS
+
 namespace GCS
 {
+using namespace boost;
+
+#ifdef USE_STRONGLY_CONNECTED_COMPONENTS
+
+using graph_t = adjacency_list<vecS, vecS, bidirectionalS>;
+using vertex_t = graph_traits<graph_t>::vertex_descriptor;
+using edge_t = graph_traits<graph_t>::edge_descriptor;
 
 // Helper class to find the maximum matching of
 // the constraint-unknowns system
@@ -111,10 +120,6 @@ private:
     }
 };
 
-using namespace boost;
-using graph_t = adjacency_list<vecS, vecS, bidirectionalS>;
-using vertex_t = graph_traits<graph_t>::vertex_descriptor;
-using edge_t = graph_traits<graph_t>::edge_descriptor;
 
 // Visitor class for the breadth first search to build the
 // under and over constrained subsystems
@@ -134,34 +139,6 @@ public:
     }
 };
 
-bool SubsystemDescription::empty() const
-{
-    return equations.empty() && unknowns.empty();
-}
-std::vector<Constraint*>
-SubsystemDescription::makeClist(const std::vector<Constraint*>& constraints,
-                                const std::set<Constraint*>& reducedConstraints) const
-{
-    std::vector<Constraint*> out;
-    out.reserve(equations.size());
-
-    for (const auto& constr : constraints) {
-        if (reducedConstraints.count(constr) == 0) {
-            out.push_back(constr);
-        }
-    }
-    return out;
-}
-std::vector<double*> SubsystemDescription::makePlist(const std::vector<double*>& parameters) const
-{
-    std::vector<double*> out;
-    out.reserve(parameters.size());
-
-    for (const auto& param : parameters) {
-        out.push_back(param);
-    }
-    return out;
-}
 
 SystemDecomposition::SystemDecomposition(const VEC_pD& parameters,
                                          const std::vector<Constraint*>& constraints,
@@ -300,6 +277,56 @@ SystemDecomposition::SystemDecomposition(const VEC_pD& parameters,
         parameterComponent[pind] = wellConstrained.size() + 1;
     }
 }
+#else
+
+SystemDecomposition::SystemDecomposition(const VEC_pD& parameters,
+                                         const std::vector<Constraint*>& constraints,
+                                         const std::map<Constraint*, VEC_pD>& c2p,
+                                         const MAP_pD_I& pIndex)
+{
+    using Graph = boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS>;
+
+    // partitioning into decoupled components
+    Graph g;
+    for (int i = 0; i < int(parameters.size() + constraints.size()); i++) {
+        boost::add_vertex(g);
+    }
+
+    int cvtid = int(parameters.size());
+    for (const auto constr : constraints) {
+        auto cparams = c2p.find(constr);
+
+        if (cparams == c2p.end()) {
+            continue;
+        }
+
+
+        for (const auto param : cparams->second) {
+            MAP_pD_I::const_iterator it = pIndex.find(param);
+            if (it != pIndex.end()) {
+                boost::add_edge(cvtid, it->second, g);
+            }
+        }
+        ++cvtid;
+    }
+
+    VEC_I components(boost::num_vertices(g));
+    int componentsSize = 0;
+    if (!components.empty()) {
+        componentsSize = boost::connected_components(g, &components[0]);
+    }
+
+    wellConstrained.resize(componentsSize);
+
+    for (size_t i = 0; i < parameters.size(); ++i) {
+        wellConstrained[components[i]].unknowns.push_back(i);
+    }
+    for (size_t i = 0; i < constraints.size(); ++i) {
+        wellConstrained[components[i + parameters.size()]].equations.push_back(i);
+    }
+}
+
+#endif
 
 size_t SystemDecomposition::size() const
 {
@@ -341,6 +368,35 @@ SystemDecomposition::makePlists(const std::vector<double*>& parameters) const
         out.push_back(overConstrained.makePlist(parameters));
     }
 
+    return out;
+}
+
+bool SubsystemDescription::empty() const
+{
+    return equations.empty() && unknowns.empty();
+}
+std::vector<Constraint*>
+SubsystemDescription::makeClist(const std::vector<Constraint*>& constraints,
+                                const std::set<Constraint*>& reducedConstraints) const
+{
+    std::vector<Constraint*> out;
+    out.reserve(equations.size());
+
+    for (const auto& constr : constraints) {
+        if (reducedConstraints.count(constr) == 0) {
+            out.push_back(constr);
+        }
+    }
+    return out;
+}
+std::vector<double*> SubsystemDescription::makePlist(const std::vector<double*>& parameters) const
+{
+    std::vector<double*> out;
+    out.reserve(parameters.size());
+
+    for (const auto& param : parameters) {
+        out.push_back(param);
+    }
     return out;
 }
 

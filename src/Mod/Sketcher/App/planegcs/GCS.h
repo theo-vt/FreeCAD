@@ -109,7 +109,7 @@ class SketcherExport System
 private:
     VEC_pD plist;        // list of the unknown parameters
     VEC_pD pdrivenlist;  // list of parameters of driven constraints
-    MAP_pD_I pIndex;
+    UMAP_pD_I pIndex;
 
     VEC_pD pDependentParameters;  // list of dependent parameters by the system
 

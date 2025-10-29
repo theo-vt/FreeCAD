@@ -39,15 +39,17 @@ class SubSystem
 private:
     int psize, csize;
     std::vector<Constraint*> clist;
-    VEC_pD plist;    // pointers to the original parameters
-    MAP_pD_pD pmap;  // redirection map from the original parameters to pvals
-    VEC_D pvals;     // current variables vector (psize)
-                     //        JacobianMatrix jacobi;  // jacobi matrix of the residuals
+    VEC_pD plist;     // pointers to the original parameters
+    UMAP_pD_pD pmap;  // redirection map from the original parameters to pvals
+    VEC_D pvals;      // current variables vector (psize)
+                      //        JacobianMatrix jacobi;  // jacobi matrix of the residuals
     std::map<double*, std::vector<Constraint*>> p2c;  // parameter to constraint adjacency list
-    void initialize(VEC_pD& params, MAP_pD_pD& reductionmap);  // called by the constructors
+    void initialize(const UMAP_pD_pD& reductionmap);  // called by the constructors
 public:
-    SubSystem(std::vector<Constraint*>& clist_, VEC_pD& params);
-    SubSystem(std::vector<Constraint*>& clist_, VEC_pD& params, MAP_pD_pD& reductionmap);
+    SubSystem(const std::vector<Constraint*>& clist_, const VEC_pD& params);
+    SubSystem(const std::vector<Constraint*>& clist_,
+              const VEC_pD& params,
+              const UMAP_pD_pD& reductionmap);
     ~SubSystem();
 
     int pSize()
@@ -62,7 +64,7 @@ public:
     void redirectParams();
     void revertParams();
 
-    void getParamMap(MAP_pD_pD& pmapOut);
+    void getParamMap(UMAP_pD_pD& pmapOut);
     void getParamList(VEC_pD& plistOut);
 
     void getParams(VEC_pD& params, Eigen::VectorXd& xOut);

@@ -21,59 +21,40 @@
  *                                                                         *
  ***************************************************************************/
 
-// The goal of this file is to break down the constraint system in smaller constraints systems
-// that can be solved in order. This is desirable because the numerical solvers have a complexity
-// of the order of O(n^3), so breaking systems down can have a massive impact on performance
+// The goal of this file is to handle substitutions, that is constraints which can be implicitly
+// solved Currently the only substitution mecanism is reduction, so if two parameters are set to be
+// equal (e.g. if a line is horizonal, y1=y2), then only one parameter y1 will be forwarded to the
+// solver and all instances of y2 will be replaced by y1 in every constraints
 
-#ifndef PLANEGCS_DECOMPOSITION_H
-#define PLANEGCS_DECOMPOSITION_H
+
+#ifndef PLANEGCS_SUBSTITUTION_H
+#define PLANEGCS_SUBSTITUTION_H
 
 #include "Util.h"
 #include "Constraints.h"
-#include "Substitution.h"
 
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace GCS
 {
 
-// This is a helper struct which contains all the necessary
-// to build a subsystem-auxsubsystem pair
-struct SubsystemPrecursor
+struct Substitution
 {
-    std::vector<Constraint*> constraints;
-    std::vector<double*> parameters;
-    UMAP_pD_pD reductionMap;
-};
+    std::vector<Constraint*> constraints;  // Constraints that could not be reduced
 
-struct SubsystemDescription
-{
-    std::vector<int> unknowns;   // Indices of unknowns in the GCS
-    std::vector<int> equations;  // Indices of equations in the GCS
+    std::vector<double*> parameters;  // Parameters that could not be reduced
+    std::vector<std::vector<double*>>
+        reducedParameter;  // For every parameter in the parameters vector there is a vector of
+                           // equal valued reduced parameters
 
-    bool empty() const;
+    std::unordered_map<double*, int> parameterToIndex;  // For every parameter in GCS, an index to
+                                                        // the parameter in the substitution
 
-    SubsystemPrecursor makeSubsystemPrecursor(const Substitution& substitution) const;
-};
-
-
-struct SystemDecomposition
-{
-public:
-    std::vector<SubsystemDescription> wellConstrained;
-    SubsystemDescription overConstrained;
-    SubsystemDescription underConstrained;
-    std::vector<int> parameterComponent;
-
-public:
-    SystemDecomposition(size_t numParams,
-                        const std::vector<Constraint*>& constraints,
-                        const std::map<Constraint*, VEC_pD>& c2p,
-                        const UMAP_pD_I& pIndex);
-
-    size_t size() const;
-
-    std::vector<SubsystemPrecursor> makeSubsystemPrecursors(const Substitution& substitution) const;
+    Substitution(const std::vector<double*>& initialParameters,
+                 const std::vector<Constraint*>& constraints,
+                 const UMAP_pD_I& paramToIndex);
 };
 
 }  // namespace GCS

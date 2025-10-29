@@ -26,6 +26,7 @@
 #include <map>
 #include <set>
 #include <vector>
+#include <unordered_map>
 
 
 namespace GCS
@@ -36,6 +37,9 @@ using VEC_I = std::vector<int>;
 using MAP_pD_pD = std::map<double*, double*>;
 using MAP_pD_D = std::map<double*, double>;
 using MAP_pD_I = std::map<double*, int>;
+using UMAP_pD_I = std::unordered_map<double*, int>;
+using UMAP_I_I = std::unordered_map<int, int>;
+using UMAP_pD_pD = std::unordered_map<double*, double*>;
 using SET_pD = std::set<double*>;
 using SET_I = std::set<int>;
 }  // namespace GCS

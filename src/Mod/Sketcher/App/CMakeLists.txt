@@ -119,6 +119,8 @@ SET(PlaneGCS_SRCS
     planegcs/qp_eq.h
     planegcs/Decomposition.h
     planegcs/Decomposition.cpp
+    planegcs/Substitution.h
+    planegcs/Substitution.cpp
 )
 SOURCE_GROUP("PlaneGCS" FILES ${PlaneGCS_SRCS})
 

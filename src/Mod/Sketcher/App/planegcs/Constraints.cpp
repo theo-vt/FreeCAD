@@ -26,6 +26,7 @@
 
 #include <cmath>
 #include <numbers>
+#include <iostream>
 
 #include <algorithm>
 #define DEBUG_DERIVS 0
@@ -55,11 +56,10 @@ Constraint::Constraint()
     , internalAlignment(Alignment::NoInternalAlignment)
 {}
 
-void Constraint::redirectParams(const MAP_pD_pD& redirectionmap)
+void Constraint::redirectParams(const UMAP_pD_pD& redirectionmap)
 {
-    int i = 0;
-    for (VEC_pD::iterator param = origpvec.begin(); param != origpvec.end(); ++param, i++) {
-        MAP_pD_pD::const_iterator it = redirectionmap.find(*param);
+    for (size_t i = 0; i < origpvec.size(); ++i) {
+        auto it = redirectionmap.find(origpvec[i]);
         if (it != redirectionmap.end()) {
             pvec[i] = it->second;
         }
@@ -71,6 +71,20 @@ void Constraint::revertParams()
 {
     pvec = origpvec;
     pvecChangedFlag = true;
+}
+void Constraint::fillParamIndices(const UMAP_pD_I& paramToIndex)
+{
+    pivec.clear();
+    pivec.reserve(pvec.size());
+    for (auto param : origpvec) {
+        auto foundBaseIndex = paramToIndex.find(param);
+
+        if (foundBaseIndex == paramToIndex.end()) {
+            pivec.push_back(-1);
+        }
+
+        pivec.push_back(foundBaseIndex->second);
+    }
 }
 
 ConstraintType Constraint::getTypeId()

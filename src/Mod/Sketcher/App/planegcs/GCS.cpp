@@ -20,6 +20,7 @@
  *                                                                         *
  ***************************************************************************/
 
+#include "Mod/Sketcher/App/planegcs/Util.h"
 #ifdef _MSC_VER
 #pragma warning(disable : 4251)
 #pragma warning(disable : 4244)
@@ -55,6 +56,7 @@
 #include "GCS.h"
 #include "qp_eq.h"
 #include "Decomposition.h"
+#include "Substitution.h"
 
 // NOTE: In CMakeList.txt -DEIGEN_NO_DEBUG is set (it does not work with a define here), to solve
 // this: this is needed to fix this SparseQR crash
@@ -1844,48 +1846,22 @@ void System::initSolution(Algorithm alg)
         clistR = clist;
     }
 
+    Substitution subst(plist, clistR, pIndex);
+
     // partitioning into decoupled components
-    SystemDecomposition decomp(plist, clistR, c2p, pIndex);
+    SystemDecomposition decomp(subst.parameters.size(), subst.constraints, c2p, pIndex);
 
-    // identification of equality constraints and parameter reduction
-    std::set<Constraint*> reducedConstrs;  // constraints that will be eliminated through reduction
-    reductionmaps.clear();                 // destroy any maps
-    reductionmaps.resize(decomp.size());   // create empty maps to be filled in
-    {
-        VEC_pD reducedParams = plist;
 
-        for (const auto& constr : clistR) {
-            if (!(constr->getTag() >= 0 && constr->getTypeId() == Equal)) {
-                continue;
-            }
-            const auto it1 = pIndex.find(constr->params()[0]);
-            const auto it2 = pIndex.find(constr->params()[1]);
-            if (it1 == pIndex.end() || it2 == pIndex.end()) {
-                continue;
-            }
-            reducedConstrs.insert(constr);
-            double* p_kept = reducedParams[it1->second];
-            double* p_replaced = reducedParams[it2->second];
-            std::ranges::replace(reducedParams, p_replaced, p_kept);
-        }
-        for (size_t i = 0; i < plist.size(); ++i) {
-            if (plist[i] != reducedParams[i]) {
-                int cid = decomp.parameterComponent[i];
-                reductionmaps[cid][plist[i]] = reducedParams[i];
-            }
-        }
-    }
-
-    clists = decomp.makeClists(clistR, reducedConstrs);
-    plists = decomp.makePlists(plist);
+    std::vector<SubsystemPrecursor> precursors = decomp.makeSubsystemPrecursors(subst);
 
     // calculates subSystems and subSystemsAux from clists, plists and reductionmaps
     clearSubSystems();
-    subSystems.resize(clists.size(), nullptr);
-    subSystemsAux.resize(clists.size(), nullptr);
-    for (std::size_t cid = 0; cid < clists.size(); ++cid) {
+    subSystems.resize(precursors.size(), nullptr);
+    subSystemsAux.resize(precursors.size(), nullptr);
+    for (size_t cid = 0; cid < precursors.size(); ++cid) {
+        const SubsystemPrecursor& precursor = precursors[cid];
         std::vector<Constraint*> clist0, clist1;
-        std::ranges::partition_copy(clists[cid],
+        std::ranges::partition_copy(precursor.constraints,
                                     std::back_inserter(clist0),
                                     std::back_inserter(clist1),
                                     [](auto constr) {
@@ -1893,10 +1869,11 @@ void System::initSolution(Algorithm alg)
                                     });
 
         if (!clist0.empty()) {
-            subSystems[cid] = new SubSystem(clist0, plists[cid], reductionmaps[cid]);
+            subSystems[cid] = new SubSystem(clist0, precursor.parameters, precursor.reductionMap);
         }
         if (!clist1.empty()) {
-            subSystemsAux[cid] = new SubSystem(clist1, plists[cid], reductionmaps[cid]);
+            subSystemsAux[cid] =
+                new SubSystem(clist1, precursor.parameters, precursor.reductionMap);
         }
     }
     std::cerr << "Subsystems: " << subSystems.size() << "\n";

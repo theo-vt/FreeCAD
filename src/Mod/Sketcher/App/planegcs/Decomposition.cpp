@@ -22,6 +22,7 @@
  ***************************************************************************/
 
 #include "Decomposition.h"
+#include "Mod/Sketcher/App/planegcs/Substitution.h"
 
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/max_cardinality_matching.hpp>
@@ -34,7 +35,7 @@
 #include <unordered_set>
 #include <iostream>
 
-// #define USE_STRONGLY_CONNECTED_COMPONENTS
+#define USE_STRONGLY_CONNECTED_COMPONENTS
 
 namespace GCS
 {
@@ -140,11 +141,11 @@ public:
 };
 
 
-SystemDecomposition::SystemDecomposition(const VEC_pD& parameters,
+SystemDecomposition::SystemDecomposition(size_t numParams,
                                          const std::vector<Constraint*>& constraints,
                                          const std::map<Constraint*, VEC_pD>& c2p,
-                                         const MAP_pD_I& pIndex)
-    : parameterComponent(parameters.size())
+                                         const UMAP_pD_I& pIndex)
+    : parameterComponent(numParams)
 {
     // This constructor implements algorithms detailed in <source>
     // in the source paper, the underconstrained graph is called G3
@@ -154,29 +155,24 @@ SystemDecomposition::SystemDecomposition(const VEC_pD& parameters,
     // are in the group X (x1, x2, x3..)
 
     // The graph G contains all the the constraints and all the parameters
-    graph_t G(parameters.size() + constraints.size());
+    graph_t G(numParams + constraints.size());
 
-    std::cerr << "System size: " << parameters.size() + constraints.size() << "\n";
+    std::cerr << "System size: " << numParams + constraints.size() << "\n";
 
     std::vector<std::pair<int, int>> bipartiteEdges;
     for (size_t c = 0; c < constraints.size(); ++c) {
         Constraint* constr = constraints[c];
-        auto foundParams = c2p.find(constr);
-        if (foundParams == c2p.end()) {
-            continue;
-        }
-        for (const auto param : foundParams->second) {
-            auto it = pIndex.find(param);
-            if (it != pIndex.end()) {
-                add_edge(
-                    c + parameters.size(),
-                    it->second,
-                    G);  // The constraints are placed after the parameters in the constraints list
-                bipartiteEdges.emplace_back(c, it->second);
+
+        for (const auto param : constr->paramsIndex()) {
+            if (param == -1) {
+                continue;
             }
+            // The constraints are placed after the parameters in the constraints list
+            add_edge(c + numParams, param, G);
+            bipartiteEdges.emplace_back(c, param);
         }
     }
-    BipartiteGraph bpGraph(constraints.size(), parameters.size(), bipartiteEdges);
+    BipartiteGraph bpGraph(constraints.size(), numParams, bipartiteEdges);
     BipartiteGraph::BPMOutput matchingOut = bpGraph.maxBPM();
 
     // Edges that are part of the maximum matching of the bipartite graph get a back edge
@@ -184,7 +180,7 @@ SystemDecomposition::SystemDecomposition(const VEC_pD& parameters,
         std::cerr << "Match: " << match.first << " :: " << match.second << "\n";
         // a match goes from equation -> unknown but both sets start at 0 so we have to offset the
         // equation index
-        add_edge(match.second, match.first + parameters.size(), G);
+        add_edge(match.second, match.first + numParams, G);
     }
 
     // Build the over constrained subsystem description (G2 in the paper)
@@ -192,7 +188,7 @@ SystemDecomposition::SystemDecomposition(const VEC_pD& parameters,
     AggregationVisitor OCVisitor(&OCVertices);
 
     for (auto unsaturated : matchingOut.unsaturatedA) {
-        breadth_first_search(G, unsaturated + parameters.size(), visitor(OCVisitor));
+        breadth_first_search(G, unsaturated + numParams, visitor(OCVisitor));
     }
     std::cerr << "OC vertices: \n";
     for (auto vert : OCVertices) {
@@ -200,9 +196,9 @@ SystemDecomposition::SystemDecomposition(const VEC_pD& parameters,
         // strongly connected components
         clear_vertex(vert, G);
 
-        if (vert >= parameters.size()) {
-            std::cerr << "[eq]" << vert - parameters.size() << "\n";
-            overConstrained.equations.push_back(vert - parameters.size());
+        if (vert >= numParams) {
+            std::cerr << "[eq]" << vert - numParams << "\n";
+            overConstrained.equations.push_back(vert - numParams);
         }
         else {
             std::cerr << "[va]" << vert << "\n";
@@ -224,9 +220,9 @@ SystemDecomposition::SystemDecomposition(const VEC_pD& parameters,
         // Remove all edges from or to this vertex so that it is not tangled in well constrained
         // strongly connected components
         clear_vertex(vert, G);
-        if (vert >= parameters.size()) {
-            std::cerr << "[eq]" << vert - parameters.size() << "\n";
-            underConstrained.equations.push_back(vert - parameters.size());
+        if (vert >= numParams) {
+            std::cerr << "[eq]" << vert - numParams << "\n";
+            underConstrained.equations.push_back(vert - numParams);
         }
         else {
             std::cerr << "[va]" << vert << "\n";
@@ -259,9 +255,9 @@ SystemDecomposition::SystemDecomposition(const VEC_pD& parameters,
         if (comp >= wellConstrained.size()) {
             wellConstrained.resize(comp + 1);
         }
-        if (ind >= parameters.size()) {
-            std::cerr << "[eq]" << ind - parameters.size() << " :: " << comp << "\n";
-            wellConstrained[comp].equations.push_back(ind - parameters.size());
+        if (ind >= numParams) {
+            std::cerr << "[eq]" << ind - numParams << " :: " << comp << "\n";
+            wellConstrained[comp].equations.push_back(ind - numParams);
         }
         else {
             std::cerr << "[va]" << ind << " :: " << comp << "\n";
@@ -279,20 +275,20 @@ SystemDecomposition::SystemDecomposition(const VEC_pD& parameters,
 }
 #else
 
-SystemDecomposition::SystemDecomposition(const VEC_pD& parameters,
+SystemDecomposition::SystemDecomposition(size_t numParams,
                                          const std::vector<Constraint*>& constraints,
                                          const std::map<Constraint*, VEC_pD>& c2p,
-                                         const MAP_pD_I& pIndex)
+                                         const UMAP_pD_I& pIndex)
 {
     using Graph = boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS>;
 
     // partitioning into decoupled components
     Graph g;
-    for (int i = 0; i < int(parameters.size() + constraints.size()); i++) {
+    for (int i = 0; i < int(numParams + constraints.size()); i++) {
         boost::add_vertex(g);
     }
 
-    int cvtid = int(parameters.size());
+    int cvtid = int(numParams);
     for (const auto constr : constraints) {
         auto cparams = c2p.find(constr);
 
@@ -300,9 +296,8 @@ SystemDecomposition::SystemDecomposition(const VEC_pD& parameters,
             continue;
         }
 
-
         for (const auto param : cparams->second) {
-            MAP_pD_I::const_iterator it = pIndex.find(param);
+            auto it = pIndex.find(param);
             if (it != pIndex.end()) {
                 boost::add_edge(cvtid, it->second, g);
             }
@@ -318,11 +313,11 @@ SystemDecomposition::SystemDecomposition(const VEC_pD& parameters,
 
     wellConstrained.resize(componentsSize);
 
-    for (size_t i = 0; i < parameters.size(); ++i) {
+    for (size_t i = 0; i < numParams; ++i) {
         wellConstrained[components[i]].unknowns.push_back(i);
     }
     for (size_t i = 0; i < constraints.size(); ++i) {
-        wellConstrained[components[i + parameters.size()]].equations.push_back(i);
+        wellConstrained[components[i + numParams]].equations.push_back(i);
     }
 }
 
@@ -333,41 +328,21 @@ size_t SystemDecomposition::size() const
     return wellConstrained.size() + (!overConstrained.empty()) + (!underConstrained.empty());
 }
 
-std::vector<std::vector<Constraint*>>
-SystemDecomposition::makeClists(const std::vector<Constraint*>& constraints,
-                                const std::set<Constraint*>& reducedConstraints) const
+std::vector<SubsystemPrecursor>
+SystemDecomposition::makeSubsystemPrecursors(const Substitution& substitution) const
 {
-    std::vector<std::vector<Constraint*>> out;
+    std::vector<SubsystemPrecursor> out;
     out.reserve(size());
 
     for (const auto& subsyst : wellConstrained) {
-        out.push_back(subsyst.makeClist(constraints, reducedConstraints));
+        out.push_back(subsyst.makeSubsystemPrecursor(substitution));
     }
     if (!underConstrained.empty()) {
-        out.push_back(underConstrained.makeClist(constraints, reducedConstraints));
+        out.push_back(underConstrained.makeSubsystemPrecursor(substitution));
     }
     if (!overConstrained.empty()) {
-        out.push_back(overConstrained.makeClist(constraints, reducedConstraints));
+        out.push_back(overConstrained.makeSubsystemPrecursor(substitution));
     }
-
-    return out;
-}
-std::vector<std::vector<double*>>
-SystemDecomposition::makePlists(const std::vector<double*>& parameters) const
-{
-    std::vector<std::vector<double*>> out;
-    out.reserve(size());
-
-    for (const auto& subsyst : wellConstrained) {
-        out.push_back(subsyst.makePlist(parameters));
-    }
-    if (!underConstrained.empty()) {
-        out.push_back(underConstrained.makePlist(parameters));
-    }
-    if (!overConstrained.empty()) {
-        out.push_back(overConstrained.makePlist(parameters));
-    }
-
     return out;
 }
 
@@ -375,27 +350,28 @@ bool SubsystemDescription::empty() const
 {
     return equations.empty() && unknowns.empty();
 }
-std::vector<Constraint*>
-SubsystemDescription::makeClist(const std::vector<Constraint*>& constraints,
-                                const std::set<Constraint*>& reducedConstraints) const
+SubsystemPrecursor
+SubsystemDescription::makeSubsystemPrecursor(const Substitution& substitution) const
 {
-    std::vector<Constraint*> out;
-    out.reserve(equations.size());
+    SubsystemPrecursor out;
+    out.constraints.reserve(equations.size());
+    out.parameters.reserve(unknowns.size());
 
-    for (const auto& constr : constraints) {
-        if (reducedConstraints.count(constr) == 0) {
-            out.push_back(constr);
-        }
+    for (auto unknown : unknowns) {
+        out.parameters.push_back(substitution.parameters[unknown]);
     }
-    return out;
-}
-std::vector<double*> SubsystemDescription::makePlist(const std::vector<double*>& parameters) const
-{
-    std::vector<double*> out;
-    out.reserve(parameters.size());
 
-    for (const auto& param : parameters) {
-        out.push_back(param);
+    for (auto eq : equations) {
+        Constraint* constr = substitution.constraints[eq];
+        out.constraints.push_back(constr);
+
+        auto origParams = constr->origParams();
+        auto paramSubstIndices = constr->paramsIndex();
+        for (size_t i = 0; i < origParams.size(); ++i) {
+            if (paramSubstIndices[i] != -1) {
+                out.reductionMap[origParams[i]] = substitution.parameters[paramSubstIndices[i]];
+            }
+        }
     }
     return out;
 }

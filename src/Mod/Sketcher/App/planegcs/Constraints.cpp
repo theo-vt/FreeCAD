@@ -58,10 +58,14 @@ Constraint::Constraint()
 
 void Constraint::redirectParams(const UMAP_pD_pD& redirectionmap)
 {
+    pvec.resize(origpvec.size());
     for (size_t i = 0; i < origpvec.size(); ++i) {
         auto it = redirectionmap.find(origpvec[i]);
         if (it != redirectionmap.end()) {
             pvec[i] = it->second;
+        }
+        else {
+            pvec[i] = origpvec[i];
         }
     }
     pvecChangedFlag = true;

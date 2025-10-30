@@ -61,22 +61,15 @@ void SubSystem::initialize(const UMAP_pD_pD& reductionmap)
 
 
     pvals.resize(psize);
-    pmap = reductionmap;
+
     for (int j = 0; j < psize; j++) {
         pvals[j] = *plist[j];
+        pmap[plist[j]] = &pvals[j];
     }
 
     p2c.clear();
     for (const auto constr : clist) {
-        VEC_pD constr_params_orig = constr->origParams();
-        SET_pD constr_params;
-        for (auto p : constr_params_orig) {
-            auto pmapfind = pmap.find(p);
-            if (pmapfind != pmap.end()) {
-                constr_params.insert(pmapfind->second);
-            }
-        }
-        for (const auto p : constr_params) {
+        for (const auto p : constr->origParams()) {
             p2c[p].push_back(constr);
         }
     }
@@ -91,7 +84,6 @@ void SubSystem::redirectParams()
 
     // redirect constraints to point to pvals
     for (auto constr : clist) {
-        constr->revertParams();  // this line will normally not be necessary
         constr->redirectParams(pmap);
     }
 }

@@ -243,7 +243,7 @@ SystemDecomposition::SystemDecomposition(size_t numParams,
     int num_scc = strong_components(G, make_iterator_property_map(components.begin(), vi_map));
 
     // std::cerr << "WC: \n";
-    wellConstrained.reserve(num_scc);
+    std::vector<std::vector<int>> vertexPerComponent;
     for (auto v : make_iterator_range(vertices(G))) {
         size_t ind = vi_map[v];
 
@@ -252,21 +252,30 @@ SystemDecomposition::SystemDecomposition(size_t numParams,
         }
 
         size_t comp = components[vi_map[v]];
-        if (comp >= wellConstrained.size()) {
-            wellConstrained.resize(comp + 1);
+        if (comp >= vertexPerComponent.size()) {
+            vertexPerComponent.resize(comp + 1);
         }
-        if (ind >= numParams) {
-            // std::cerr << "[eq]" << ind - numParams << " :: " << comp << "\n";
-            wellConstrained[comp].equations.push_back(ind - numParams);
+        vertexPerComponent[comp].push_back(ind);
+    }
+    for (auto vertices : vertexPerComponent) {
+        if (vertices.empty()) {
+            continue;
         }
-        else {
-            // std::cerr << "[va]" << ind << " :: " << comp << "\n";
-            wellConstrained[comp].unknowns.push_back(ind);
-            parameterComponent[ind] = comp;
+        wellConstrained.push_back({});
+        for (auto vertex : vertices) {
+            if (vertex >= numParams) {
+                // std::cerr << "[eq]" << ind - numParams << " :: " << comp << "\n";
+                wellConstrained.back().equations.push_back(vertex - numParams);
+            }
+            else {
+                // std::cerr << "[va]" << ind << " :: " << comp << "\n";
+                wellConstrained.back().unknowns.push_back(vertex);
+                parameterComponent[vertex] = wellConstrained.size() - 1;
+            }
         }
     }
 
-    for (auto pind : overConstrained.unknowns) {
+    for (auto pind : underConstrained.unknowns) {
         parameterComponent[pind] = wellConstrained.size();
     }
     for (auto pind : overConstrained.unknowns) {
@@ -348,7 +357,7 @@ SystemDecomposition::makeSubsystemPrecursors(const Substitution& substitution) c
 
 bool SubsystemDescription::empty() const
 {
-    return equations.empty() && unknowns.empty();
+    return equations.empty() || unknowns.empty();
 }
 SubsystemPrecursor
 SubsystemDescription::makeSubsystemPrecursor(const Substitution& substitution) const

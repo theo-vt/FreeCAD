@@ -483,7 +483,7 @@ System::System()
     , qrAlgorithm(EigenSparseQR)
     , dogLegGaussStep(FullPivLU)
     , qrpivotThreshold(1E-13)
-    , debugMode(Minimal)
+    , debugMode(IterationLevel)
     , LM_eps(1E-10)
     , LM_eps1(1E-80)
     , LM_tau(1E-3)
@@ -2318,6 +2318,7 @@ int System::solve_DL(SubSystem* subsys, bool isRedundantsolving)
 
         const std::string tmp = stream.str();
         Base::Console().log(tmp.c_str());
+        std::cerr << tmp << "\n";
     }
 
     Eigen::VectorXd x(xsize), x_new(xsize);
@@ -2475,6 +2476,7 @@ int System::solve_DL(SubSystem* subsys, bool isRedundantsolving)
 
             const std::string tmp = stream.str();
             Base::Console().log(tmp.c_str());
+            std::cerr << tmp << "\n";
         }
 
         // count this iteration and start again

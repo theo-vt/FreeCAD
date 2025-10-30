@@ -29,6 +29,7 @@
 #include <boost/parameter/parameters.hpp>
 #include <unordered_map>
 #include <vector>
+#include <iostream>
 
 namespace GCS
 {
@@ -77,14 +78,20 @@ struct SubstitutionFactory
         }
         // Both parameters are in a blob so merge them
         if (foundA != paramToBlob.end() && foundB != paramToBlob.end()) {
-            if (foundA->second < foundB->second) {
-                std::swap(foundA, foundB);
+            int blobA = foundA->second;
+            int blobB = foundB->second;
+
+            if (blobA > blobB) {
+                std::swap(blobA, blobB);
             }
 
-            substitutionBlobs[foundA->second].merge(substitutionBlobs[foundB->second]);
-            substitutionBlobs.erase(substitutionBlobs.begin() + foundB->second);
-            paramToBlob[foundB->first] = foundA->first;
+            substitutionBlobs[blobA].merge(substitutionBlobs[blobB]);
 
+            reassignBlob(blobB, blobA);
+            for (size_t i = blobB + 1; i < substitutionBlobs.size(); ++i) {
+                reassignBlob(i, i - 1);
+            }
+            substitutionBlobs.erase(substitutionBlobs.begin() + blobB);
             return;
         }
 
@@ -103,6 +110,12 @@ struct SubstitutionFactory
 
         return foundA != paramToBlob.end() && foundB != paramToBlob.end()
             && foundA->second == foundB->second;
+    }
+    void reassignBlob(size_t src, size_t dst)
+    {
+        for (auto param : substitutionBlobs[src].parameters) {
+            paramToBlob[param] = dst;
+        }
     }
 
     UMAP_I_I compile()
@@ -188,14 +201,15 @@ Substitution::Substitution(const std::vector<double*>& initialParameters,
 {
     SubstitutionFactory factory;
 
-    std::vector<ConstraintSubstitutionAttempt> attempts(initialConstraints.size());
+    std::vector<ConstraintSubstitutionAttempt> attempts(initialConstraints.size(),
+                                                        ConstraintSubstitutionAttempt::Unknown);
     // bool done = false;
 
     for (size_t i = 0; i < initialConstraints.size(); ++i) {
         auto constr = initialConstraints[i];
 
         // No substitution for temporary constraints
-        if (constr->getTag() < 0 || constr->getTypeId() == Equal) {
+        if (constr->getTag() < 0 || constr->getTypeId() != Equal) {
             continue;
         }
 
@@ -240,10 +254,10 @@ Substitution::Substitution(const std::vector<double*>& initialParameters,
         auto foundBlob = factory.paramToBlob.find(i);
 
         if (foundBlob != factory.paramToBlob.end()) {
-            if (parameters[foundBlob->second] != initialParameters[foundBlob->second]) {
-                reducedParameter[foundBlob->second].push_back(initialParameters[foundBlob->second]);
+            if (parameters[foundBlob->second] != initialParameters[i]) {
+                reducedParameter[foundBlob->second].push_back(initialParameters[i]);
             }
-            parameterToIndex[initialParameters[foundBlob->second]] = foundBlob->second;
+            parameterToIndex[initialParameters[i]] = foundBlob->second;
         }
         else {
             parameters.push_back(initialParameters[i]);
@@ -257,6 +271,8 @@ Substitution::Substitution(const std::vector<double*>& initialParameters,
         constraints.push_back(initialConstraints[i]);
         initialConstraints[i]->fillParamIndices(parameterToIndex);
     }
+    std::cerr << "#Constraints " << constraints.size() << " (from " << initialConstraints.size()
+              << ")\n";
 }
 
 }  // namespace GCS

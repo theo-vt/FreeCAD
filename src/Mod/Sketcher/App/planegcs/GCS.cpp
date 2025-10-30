@@ -1846,15 +1846,17 @@ void System::initSolution(Algorithm alg)
         clistR = clist;
     }
 
-    Substitution subst(plist, clistR, pIndex);
+    substitution = Substitution(plist, clistR, pIndex);
 
     // partitioning into decoupled components
-    SystemDecomposition decomp(subst.parameters.size(), subst.constraints, c2p, pIndex);
+    SystemDecomposition decomp(substitution.parameters.size(),
+                               substitution.constraints,
+                               c2p,
+                               pIndex);
 
 
-    std::vector<SubsystemPrecursor> precursors = decomp.makeSubsystemPrecursors(subst);
+    std::vector<SubsystemPrecursor> precursors = decomp.makeSubsystemPrecursors(substitution);
 
-    // calculates subSystems and subSystemsAux from clists, plists and reductionmaps
     clearSubSystems();
     subSystems.resize(precursors.size(), nullptr);
     subSystemsAux.resize(precursors.size(), nullptr);
@@ -4725,10 +4727,10 @@ void System::applySolution()
         if (subSystems[cid]) {
             subSystems[cid]->applySolution();
         }
-        for (MAP_pD_pD::const_iterator it = reductionmaps[cid].begin();
-             it != reductionmaps[cid].end();
-             ++it) {
-            *(it->first) = *(it->second);
+    }
+    for (size_t i = 0; i < substitution.reducedParameter.size(); ++i) {
+        for (auto param : substitution.reducedParameter[i]) {
+            *param = *substitution.parameters[i];
         }
     }
 }

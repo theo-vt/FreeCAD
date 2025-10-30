@@ -55,6 +55,7 @@ struct Substitution
     Substitution(const std::vector<double*>& initialParameters,
                  const std::vector<Constraint*>& constraints,
                  const UMAP_pD_I& paramToIndex);
+    Substitution() = default;
 };
 
 }  // namespace GCS

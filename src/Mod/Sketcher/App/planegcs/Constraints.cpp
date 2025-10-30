@@ -81,6 +81,7 @@ void Constraint::fillParamIndices(const UMAP_pD_I& paramToIndex)
 
         if (foundBaseIndex == paramToIndex.end()) {
             pivec.push_back(-1);
+            continue;
         }
 
         pivec.push_back(foundBaseIndex->second);

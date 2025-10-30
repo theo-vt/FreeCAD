@@ -27,6 +27,7 @@
 
 #include "../../SketcherGlobal.h"
 #include "SubSystem.h"
+#include "Substitution.h"
 
 
 #define EIGEN_VERSION                                                                              \
@@ -131,7 +132,7 @@ private:
     std::vector<VEC_pD> plists;  // partitioned plist except equality constraints
     // partitioned clist except equality constraints
     std::vector<std::vector<Constraint*>> clists;
-    std::vector<MAP_pD_pD> reductionmaps;  // for simplification of equality constraints
+    Substitution substitution;
 
     int dofs;
     std::set<Constraint*> redundant;

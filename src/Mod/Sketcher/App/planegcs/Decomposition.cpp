@@ -157,7 +157,7 @@ SystemDecomposition::SystemDecomposition(size_t numParams,
     // The graph G contains all the the constraints and all the parameters
     graph_t G(numParams + constraints.size());
 
-    std::cerr << "System size: " << numParams + constraints.size() << "\n";
+    // std::cerr << "System size: " << numParams + constraints.size() << "\n";
 
     std::vector<std::pair<int, int>> bipartiteEdges;
     for (size_t c = 0; c < constraints.size(); ++c) {
@@ -177,7 +177,7 @@ SystemDecomposition::SystemDecomposition(size_t numParams,
 
     // Edges that are part of the maximum matching of the bipartite graph get a back edge
     for (auto match : matchingOut.matching) {
-        std::cerr << "Match: " << match.first << " :: " << match.second << "\n";
+        // std::cerr << "Match: " << match.first << " :: " << match.second << "\n";
         // a match goes from equation -> unknown but both sets start at 0 so we have to offset the
         // equation index
         add_edge(match.second, match.first + numParams, G);
@@ -190,18 +190,18 @@ SystemDecomposition::SystemDecomposition(size_t numParams,
     for (auto unsaturated : matchingOut.unsaturatedA) {
         breadth_first_search(G, unsaturated + numParams, visitor(OCVisitor));
     }
-    std::cerr << "OC vertices: \n";
+    // std::cerr << "OC vertices: \n";
     for (auto vert : OCVertices) {
         // Remove all edges from or to this vertex so that it is not tangled in well constrained
         // strongly connected components
         clear_vertex(vert, G);
 
         if (vert >= numParams) {
-            std::cerr << "[eq]" << vert - numParams << "\n";
+            // std::cerr << "[eq]" << vert - numParams << "\n";
             overConstrained.equations.push_back(vert - numParams);
         }
         else {
-            std::cerr << "[va]" << vert << "\n";
+            // std::cerr << "[va]" << vert << "\n";
             overConstrained.unknowns.push_back(vert);
         }
     }
@@ -215,17 +215,17 @@ SystemDecomposition::SystemDecomposition(size_t numParams,
         breadth_first_search(rg, unsaturated, visitor(UCVisitor));
     }
 
-    std::cerr << "UC vertices: \n";
+    // std::cerr << "UC vertices: \n";
     for (auto vert : UCVertices) {
         // Remove all edges from or to this vertex so that it is not tangled in well constrained
         // strongly connected components
         clear_vertex(vert, G);
         if (vert >= numParams) {
-            std::cerr << "[eq]" << vert - numParams << "\n";
+            // std::cerr << "[eq]" << vert - numParams << "\n";
             underConstrained.equations.push_back(vert - numParams);
         }
         else {
-            std::cerr << "[va]" << vert << "\n";
+            // std::cerr << "[va]" << vert << "\n";
             underConstrained.unknowns.push_back(vert);
         }
     }
@@ -242,7 +242,7 @@ SystemDecomposition::SystemDecomposition(size_t numParams,
     auto vi_map = make_assoc_property_map(index_map);
     int num_scc = strong_components(G, make_iterator_property_map(components.begin(), vi_map));
 
-    std::cerr << "WC: \n";
+    // std::cerr << "WC: \n";
     wellConstrained.reserve(num_scc);
     for (auto v : make_iterator_range(vertices(G))) {
         size_t ind = vi_map[v];
@@ -256,11 +256,11 @@ SystemDecomposition::SystemDecomposition(size_t numParams,
             wellConstrained.resize(comp + 1);
         }
         if (ind >= numParams) {
-            std::cerr << "[eq]" << ind - numParams << " :: " << comp << "\n";
+            // std::cerr << "[eq]" << ind - numParams << " :: " << comp << "\n";
             wellConstrained[comp].equations.push_back(ind - numParams);
         }
         else {
-            std::cerr << "[va]" << ind << " :: " << comp << "\n";
+            // std::cerr << "[va]" << ind << " :: " << comp << "\n";
             wellConstrained[comp].unknowns.push_back(ind);
             parameterComponent[ind] = comp;
         }

@@ -40,10 +40,28 @@ namespace GCS
 struct SubstitutionBlob
 {
     std::vector<int> parameters;
+    bool isConst {false};
+
+    // If the blob is not const, this will be the parameter "exported" to the solver, if it is a
+    // const, than this is the parmaeter which has the const constraints and will drive the blob
+    // value in Substitution::apply_const
+    int root {0};
 
     void add(int param)
     {
         parameters.push_back(param);
+    }
+    bool addConst(int param)
+    {
+        if (isConst) {
+            return false;
+        }
+
+        add(param);
+        root = parameters.size() - 1;
+        isConst = true;
+
+        return true;
     }
     void merge(const SubstitutionBlob& other)
     {
@@ -60,7 +78,7 @@ struct SubstitutionFactory
     std::unordered_map<int, int>
         paramToBlob;  // Map between parameters (index) and substitution blob (index)
 
-    void addEqual(int a, int b)
+    bool addEqual(int a, int b)
     {
         auto foundA = paramToBlob.find(a);
         auto foundB = paramToBlob.find(b);
@@ -74,12 +92,16 @@ struct SubstitutionFactory
             paramToBlob[a] = substitutionBlobs.size() - 1;
             paramToBlob[b] = substitutionBlobs.size() - 1;
 
-            return;
+            return true;
         }
         // Both parameters are in a blob so merge them
         if (foundA != paramToBlob.end() && foundB != paramToBlob.end()) {
             int blobA = foundA->second;
             int blobB = foundB->second;
+
+            if (blobA == blobB) {
+                return false;  // This substitution already exist, maybe the constraint is redundant
+            }
 
             if (blobA > blobB) {
                 std::swap(blobA, blobB);
@@ -92,7 +114,8 @@ struct SubstitutionFactory
                 reassignBlob(i, i - 1);
             }
             substitutionBlobs.erase(substitutionBlobs.begin() + blobB);
-            return;
+
+            return true;
         }
 
         // One of the two parameters is in a blob, so add the other to it
@@ -102,8 +125,10 @@ struct SubstitutionFactory
         }
         substitutionBlobs[foundA->second].add(foundB->second);
         paramToBlob[b] = foundA->second;
+
+        return true;
     }
-    bool equal(int a, int b)
+    bool areEqual(int a, int b)
     {
         auto foundA = paramToBlob.find(a);
         auto foundB = paramToBlob.find(b);
@@ -111,6 +136,10 @@ struct SubstitutionFactory
         return foundA != paramToBlob.end() && foundB != paramToBlob.end()
             && foundA->second == foundB->second;
     }
+    bool addConst(int param)
+    {}
+    bool isConst(int param)
+    {}
     void reassignBlob(size_t src, size_t dst)
     {
         for (auto param : substitutionBlobs[src].parameters) {
@@ -122,7 +151,7 @@ struct SubstitutionFactory
     {
         UMAP_I_I out;
         for (auto p2b : paramToBlob) {
-            out[p2b.first] = substitutionBlobs[p2b.second].parameters[0];
+            out[p2b.first] = substitutionBlobs[p2b.second].root;
         }
         return out;
     }
@@ -142,12 +171,19 @@ ConstraintSubstitutionAttempt substitutionForEqual(Constraint* constr,
 {
     const auto foundP1 = paramToIndex.find(constr->params()[0]);
     const auto foundP2 = paramToIndex.find(constr->params()[1]);
+
+    if (foundP1 == paramToIndex.end() && foundP2 != paramToIndex.end()) {
+        factory.addConst(foundP1->second);
+    }
+
     if (foundP1 == paramToIndex.end() || foundP2 == paramToIndex.end()) {
         return ConstraintSubstitutionAttempt::No;
     }
 
-    factory.addEqual(foundP1->second, foundP2->second);
-    return ConstraintSubstitutionAttempt::Yes;
+    if (factory.addEqual(foundP1->second, foundP2->second)) {
+        return ConstraintSubstitutionAttempt::Yes;
+    }
+    return ConstraintSubstitutionAttempt::No;
 }
 ConstraintSubstitutionAttempt substitutionForPerpendicular(Constraint* constr,
                                                            const UMAP_pD_I& paramToIndex,
@@ -169,25 +205,25 @@ ConstraintSubstitutionAttempt substitutionForPerpendicular(Constraint* constr,
     }
 
     // First line is vertical, second line should be horizontal
-    if (factory.equal(l1x1->second, l1x2->second)) {
+    if (factory.areEqual(l1x1->second, l1x2->second)) {
         factory.addEqual(l2y1->second, l2y2->second);
         return ConstraintSubstitutionAttempt::Yes;
     }
 
     // First line is horizontal, second line should be vertical
-    if (factory.equal(l1y1->second, l1y2->second)) {
+    if (factory.areEqual(l1y1->second, l1y2->second)) {
         factory.addEqual(l2x1->second, l2x2->second);
         return ConstraintSubstitutionAttempt::Yes;
     }
 
     // Second line is vertical, first line should be horizontal
-    if (factory.equal(l2x1->second, l2x2->second)) {
+    if (factory.areEqual(l2x1->second, l2x2->second)) {
         factory.addEqual(l1y1->second, l1y2->second);
         return ConstraintSubstitutionAttempt::Yes;
     }
 
     // Second line is horizontal, fist line should be vertical
-    if (factory.equal(l2y1->second, l2y2->second)) {
+    if (factory.areEqual(l2y1->second, l2y2->second)) {
         factory.addEqual(l1x1->second, l1x2->second);
         return ConstraintSubstitutionAttempt::Yes;
     }
@@ -246,7 +282,9 @@ Substitution::Substitution(const std::vector<double*>& initialParameters,
 
     parameters.reserve(factory.substitutionBlobs.size());
     for (const auto& blob : factory.substitutionBlobs) {
-        parameters.push_back(initialParameters[blob.parameters[0]]);
+        if (!blob.isConst) {
+            parameters.push_back(initialParameters[blob.root]);
+        }
     }
     reducedParameter.resize(parameters.size());
 
@@ -264,6 +302,14 @@ Substitution::Substitution(const std::vector<double*>& initialParameters,
             parameterToIndex[initialParameters[i]] = parameters.size() - 1;
         }
     }
+    parameterVals.reserve(parameters.size());
+    for (auto parameter : parameters) {
+        parameterVals.push_back(*parameter);
+    }
+    for (auto paramAndIndex : parameterToIndex) {
+        parameterToVal[paramAndIndex.first] = &parameterVals[paramAndIndex.second];
+    }
+
     for (size_t i = 0; i < attempts.size(); ++i) {
         if (attempts[i] == ConstraintSubstitutionAttempt::Yes) {
             continue;  // This constraint was substituted, no need to solve for it
@@ -273,6 +319,19 @@ Substitution::Substitution(const std::vector<double*>& initialParameters,
     }
     std::cerr << "#Constraints " << constraints.size() << " (from " << initialConstraints.size()
               << ")\n";
+}
+
+void Substitution::apply()
+{
+    for (size_t i = 0; i < parameters.size(); ++i) {
+        *parameters[i] = parameterVals[i];
+    }
+
+    for (size_t r = 0; r < reducedParameter.size(); ++r) {
+        for (size_t p = 0; p < reducedParameter[r].size(); ++p) {
+            *reducedParameter[r][p] = *parameters[r];
+        }
+    }
 }
 
 }  // namespace GCS

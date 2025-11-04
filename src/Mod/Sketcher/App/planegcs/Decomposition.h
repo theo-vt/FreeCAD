@@ -53,7 +53,7 @@ struct SubsystemDescription
 
     bool empty() const;
 
-    SubsystemPrecursor makeSubsystemPrecursor(const Substitution& substitution) const;
+    SubsystemPrecursor makeSubsystemPrecursor(Substitution& substitution) const;
 };
 
 
@@ -73,7 +73,7 @@ public:
 
     size_t size() const;
 
-    std::vector<SubsystemPrecursor> makeSubsystemPrecursors(const Substitution& substitution) const;
+    std::vector<SubsystemPrecursor> makeSubsystemPrecursors(Substitution& substitution) const;
 };
 
 }  // namespace GCS

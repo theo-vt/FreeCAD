@@ -41,10 +41,8 @@ private:
     std::vector<Constraint*> clist;
     VEC_pD plist;     // pointers to the original parameters
     UMAP_pD_pD pmap;  // redirection map from the original parameters to pvals
-    VEC_D pvals;      // current variables vector (psize)
-                      //        JacobianMatrix jacobi;  // jacobi matrix of the residuals
     std::map<double*, std::vector<Constraint*>> p2c;  // parameter to constraint adjacency list
-    void initialize(const UMAP_pD_pD& reductionmap);  // called by the constructors
+    void initialize();                                // called by the constructors
 public:
     SubSystem(const std::vector<Constraint*>& clist_, const VEC_pD& params);
     SubSystem(const std::vector<Constraint*>& clist_,
@@ -85,7 +83,6 @@ public:
     double maxStep(VEC_pD& params, Eigen::VectorXd& xdir);
     double maxStep(Eigen::VectorXd& xdir);
 
-    void applySolution();
     void analyse(Eigen::MatrixXd& J, Eigen::MatrixXd& ker, Eigen::MatrixXd& img);
     void report();
 

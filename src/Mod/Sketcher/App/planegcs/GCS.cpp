@@ -1871,11 +1871,12 @@ void System::initSolution(Algorithm alg)
                                     });
 
         if (!clist0.empty()) {
-            subSystems[cid] = new SubSystem(clist0, precursor.parameters, precursor.reductionMap);
+            subSystems[cid] =
+                new SubSystem(clist0, precursor.parameters, substitution.parameterToVal);
         }
         if (!clist1.empty()) {
             subSystemsAux[cid] =
-                new SubSystem(clist1, precursor.parameters, precursor.reductionMap);
+                new SubSystem(clist1, precursor.parameters, substitution.parameterToVal);
         }
     }
     std::cerr << "Subsystems: " << subSystems.size() << "\n";
@@ -1937,6 +1938,8 @@ int System::solve(bool isFine, Algorithm alg, bool isRedundantsolving)
         }
     }
     if (res == Success) {
+        // substitution.apply();
+
         for (std::set<Constraint*>::const_iterator constr = redundant.begin();
              constr != redundant.end();
              ++constr) {
@@ -4722,19 +4725,7 @@ int System::solve(SubSystem* subsysA, SubSystem* subsysB, bool /*isFine*/, bool 
 
 void System::applySolution()
 {
-    for (int cid = 0; cid < int(subSystems.size()); cid++) {
-        if (subSystemsAux[cid]) {
-            subSystemsAux[cid]->applySolution();
-        }
-        if (subSystems[cid]) {
-            subSystems[cid]->applySolution();
-        }
-    }
-    for (size_t i = 0; i < substitution.reducedParameter.size(); ++i) {
-        for (auto param : substitution.reducedParameter[i]) {
-            *param = *substitution.parameters[i];
-        }
-    }
+    substitution.apply();
 }
 
 void System::undoSolution()
@@ -5590,7 +5581,8 @@ void System::identifyConflictingRedundantConstraints(
     }
 
     if (res == Success) {
-        subSysTmp->applySolution();
+        // TODO-theo-vt how can functionality be restored here?
+        // subSysTmp->applySolution();
         std::ranges::copy_if(skipped,
                              std::inserter(redundant, redundant.begin()),
                              [this](const auto& constr) {

@@ -38,8 +38,7 @@ SubSystem::SubSystem(const std::vector<Constraint*>& clist_, const VEC_pD& param
     : clist(clist_)
     , plist(params)
 {
-    UMAP_pD_pD dummymap;
-    initialize(dummymap);
+    initialize();
 }
 
 SubSystem::SubSystem(const std::vector<Constraint*>& clist_,
@@ -47,25 +46,18 @@ SubSystem::SubSystem(const std::vector<Constraint*>& clist_,
                      const UMAP_pD_pD& reductionmap)
     : clist(clist_)
     , plist(params)
+    , pmap(reductionmap)
 {
-    initialize(reductionmap);
+    initialize();
 }
 
 SubSystem::~SubSystem()
 {}
 
-void SubSystem::initialize(const UMAP_pD_pD& reductionmap)
+void SubSystem::initialize()
 {
     csize = static_cast<int>(clist.size());
     psize = static_cast<int>(plist.size());
-
-
-    pvals.resize(psize);
-
-    for (int j = 0; j < psize; j++) {
-        pvals[j] = *plist[j];
-        pmap[plist[j]] = &pvals[j];
-    }
 
     p2c.clear();
     for (const auto constr : clist) {
@@ -77,12 +69,7 @@ void SubSystem::initialize(const UMAP_pD_pD& reductionmap)
 
 void SubSystem::redirectParams()
 {
-    // copying values to pvals
-    for (auto p : pmap) {
-        *(p.second) = *(p.first);
-    }
-
-    // redirect constraints to point to pvals
+    // redirect constraints to point to GCS.substitution.parameterVals
     for (auto constr : clist) {
         constr->redirectParams(pmap);
     }
@@ -126,7 +113,7 @@ void SubSystem::getParams(Eigen::VectorXd& xOut)
     }
 
     for (int i = 0; i < psize; i++) {
-        xOut[i] = pvals[i];
+        xOut[i] = *plist[i];
     }
 }
 
@@ -145,7 +132,7 @@ void SubSystem::setParams(Eigen::VectorXd& xIn)
 {
     assert(xIn.size() == psize);
     for (int i = 0; i < psize; i++) {
-        pvals[i] = xIn[i];
+        *plist[i] = xIn[i];
     }
 }
 
@@ -195,11 +182,8 @@ void SubSystem::calcJacobi(VEC_pD& params, Eigen::MatrixXd& jacobi)
 {
     jacobi.setZero(csize, params.size());
     for (int j = 0; j < int(params.size()); j++) {
-        const auto pmapfind = pmap.find(params[j]);
-        if (pmapfind != pmap.end()) {
-            for (int i = 0; i < csize; i++) {
-                jacobi(i, j) = clist[i]->grad(pmapfind->second);
-            }
+        for (int i = 0; i < csize; i++) {
+            jacobi(i, j) = clist[i]->grad(params[j]);
         }
     }
 }
@@ -253,13 +237,6 @@ double SubSystem::maxStep(VEC_pD& params, Eigen::VectorXd& xdir)
 double SubSystem::maxStep(Eigen::VectorXd& xdir)
 {
     return maxStep(plist, xdir);
-}
-
-void SubSystem::applySolution()
-{
-    for (const auto p2p : pmap) {
-        *(p2p.first) = *(p2p.second);
-    }
 }
 
 void SubSystem::analyse(Eigen::MatrixXd& /*J*/, Eigen::MatrixXd& /*ker*/, Eigen::MatrixXd& /*img*/)

@@ -51,11 +51,17 @@ struct Substitution
 
     std::unordered_map<double*, int> parameterToIndex;  // For every parameter in GCS, an index to
                                                         // the parameter in the substitution
+    std::unordered_map<double*, double*>
+        parameterToVal;  // For every paremeter in GCS a mapping to the solvable value
 
+    std::vector<double> parameterVals;  // For every parameter in the substitution, a value whose
+                                        // pointer can be passed to subsystems for solving
     Substitution(const std::vector<double*>& initialParameters,
                  const std::vector<Constraint*>& constraints,
                  const UMAP_pD_I& paramToIndex);
     Substitution() = default;
+
+    void apply();
 };
 
 }  // namespace GCS

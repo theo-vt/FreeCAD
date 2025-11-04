@@ -338,7 +338,7 @@ size_t SystemDecomposition::size() const
 }
 
 std::vector<SubsystemPrecursor>
-SystemDecomposition::makeSubsystemPrecursors(const Substitution& substitution) const
+SystemDecomposition::makeSubsystemPrecursors(Substitution& substitution) const
 {
     std::vector<SubsystemPrecursor> out;
     out.reserve(size());
@@ -359,28 +359,27 @@ bool SubsystemDescription::empty() const
 {
     return equations.empty() || unknowns.empty();
 }
-SubsystemPrecursor
-SubsystemDescription::makeSubsystemPrecursor(const Substitution& substitution) const
+SubsystemPrecursor SubsystemDescription::makeSubsystemPrecursor(Substitution& substitution) const
 {
     SubsystemPrecursor out;
     out.constraints.reserve(equations.size());
     out.parameters.reserve(unknowns.size());
 
     for (auto unknown : unknowns) {
-        out.parameters.push_back(substitution.parameters[unknown]);
+        out.parameters.push_back(&substitution.parameterVals[unknown]);
     }
 
     for (auto eq : equations) {
         Constraint* constr = substitution.constraints[eq];
         out.constraints.push_back(constr);
 
-        auto origParams = constr->origParams();
-        auto paramSubstIndices = constr->paramsIndex();
-        for (size_t i = 0; i < origParams.size(); ++i) {
-            if (paramSubstIndices[i] != -1) {
-                out.reductionMap[origParams[i]] = substitution.parameters[paramSubstIndices[i]];
-            }
-        }
+        // auto origParams = constr->origParams();
+        // auto paramSubstIndices = constr->paramsIndex();
+        // for (size_t i = 0; i < origParams.size(); ++i) {
+        //     if (paramSubstIndices[i] != -1) {
+        //         out.reductionMap[substitution.parameters[paramSubstIndices[i]]] = origParams[i];
+        //     }
+        // }
     }
     return out;
 }

@@ -1917,6 +1917,7 @@ int System::solve(bool isFine, Algorithm alg, bool isRedundantsolving)
         return Failed;
     }
 
+    substitution.applyConst();
     bool isReset = false;
     // return success by default in order to permit coincidence constraints to be applied
     // even if no other system has to be solved
@@ -1938,8 +1939,6 @@ int System::solve(bool isFine, Algorithm alg, bool isRedundantsolving)
         }
     }
     if (res == Success) {
-        // substitution.apply();
-
         for (std::set<Constraint*>::const_iterator constr = redundant.begin();
              constr != redundant.end();
              ++constr) {

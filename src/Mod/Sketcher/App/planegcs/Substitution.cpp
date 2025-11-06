@@ -30,6 +30,7 @@
 #include <unordered_map>
 #include <vector>
 #include <iostream>
+#include <optional>
 
 namespace GCS
 {
@@ -40,28 +41,11 @@ namespace GCS
 struct SubstitutionBlob
 {
     std::vector<int> parameters;
-    bool isConst {false};
-
-    // If the blob is not const, this will be the parameter "exported" to the solver, if it is a
-    // const, than this is the parmaeter which has the const constraints and will drive the blob
-    // value in Substitution::apply_const
-    int root {0};
+    std::optional<double> constValue;
 
     void add(int param)
     {
         parameters.push_back(param);
-    }
-    bool addConst(int param)
-    {
-        if (isConst) {
-            return false;
-        }
-
-        add(param);
-        root = parameters.size() - 1;
-        isConst = true;
-
-        return true;
     }
     void merge(const SubstitutionBlob& other)
     {
@@ -136,24 +120,43 @@ struct SubstitutionFactory
         return foundA != paramToBlob.end() && foundB != paramToBlob.end()
             && foundA->second == foundB->second;
     }
-    bool addConst(int param)
-    {}
+    bool addConst(int param, double value)
+    {
+        auto foundParam = paramToBlob.find(param);
+
+        // Create a new const substitution blob with a single parameter
+        if (foundParam == paramToBlob.end()) {
+            substitutionBlobs.push_back({});
+            substitutionBlobs.back().add(param);
+            substitutionBlobs.back().constValue = value;
+
+            return true;
+        }
+
+        // make the substitution blob const
+
+        // The blob is already const, not allowed
+        if (substitutionBlobs[foundParam->second].constValue.has_value()) {
+            return false;
+        }
+
+        substitutionBlobs[foundParam->second].constValue = value;
+        return true;
+    }
     bool isConst(int param)
-    {}
+    {
+        auto foundParam = paramToBlob.find(param);
+
+        if (foundParam != paramToBlob.end()) {
+            return substitutionBlobs[foundParam->second].constValue.has_value();
+        }
+        return false;
+    }
     void reassignBlob(size_t src, size_t dst)
     {
         for (auto param : substitutionBlobs[src].parameters) {
             paramToBlob[param] = dst;
         }
-    }
-
-    UMAP_I_I compile()
-    {
-        UMAP_I_I out;
-        for (auto p2b : paramToBlob) {
-            out[p2b.first] = substitutionBlobs[p2b.second].root;
-        }
-        return out;
     }
 };
 
@@ -173,10 +176,15 @@ ConstraintSubstitutionAttempt substitutionForEqual(Constraint* constr,
     const auto foundP2 = paramToIndex.find(constr->params()[1]);
 
     if (foundP1 == paramToIndex.end() && foundP2 != paramToIndex.end()) {
-        factory.addConst(foundP1->second);
+        factory.addConst(foundP2->second, *constr->params()[0]);
+        return ConstraintSubstitutionAttempt::Yes;
+    }
+    if (foundP1 == paramToIndex.end() && foundP2 != paramToIndex.end()) {
+        factory.addConst(foundP2->second, *constr->params()[0]);
+        return ConstraintSubstitutionAttempt::Yes;
     }
 
-    if (foundP1 == paramToIndex.end() || foundP2 == paramToIndex.end()) {
+    if (foundP1 == paramToIndex.end() && foundP2 == paramToIndex.end()) {
         return ConstraintSubstitutionAttempt::No;
     }
 
@@ -244,8 +252,7 @@ Substitution::Substitution(const std::vector<double*>& initialParameters,
     for (size_t i = 0; i < initialConstraints.size(); ++i) {
         auto constr = initialConstraints[i];
 
-        // No substitution for temporary constraints
-        if (constr->getTag() < 0 || constr->getTypeId() != Equal) {
+        if (constr->getTypeId() != Equal) {
             continue;
         }
 
@@ -282,22 +289,32 @@ Substitution::Substitution(const std::vector<double*>& initialParameters,
 
     parameters.reserve(factory.substitutionBlobs.size());
     for (const auto& blob : factory.substitutionBlobs) {
-        if (!blob.isConst) {
-            parameters.push_back(initialParameters[blob.root]);
+        if (!blob.constValue.has_value()) {
+            parameters.push_back(initialParameters[blob.parameters[0]]);
+            reducedParameter.push_back({});
+
+            parameterToIndex[parameters.back()] = parameters.size() - 1;
+            for (size_t i = 1; i < blob.parameters.size(); ++i) {
+                double* param = initialParameters[blob.parameters[i]];
+                reducedParameter.back().push_back(param);
+                parameterToIndex[param] = parameters.size() - 1;
+            }
+        }
+        else {
+            constParams.emplace_back(VEC_pD {}, *blob.constValue);
+            for (auto blobParam : blob.parameters) {
+                double* param = initialParameters[blobParam];
+                constParams.back().first.push_back(param);
+                parameterToIndex[param] = -1;
+            }
         }
     }
-    reducedParameter.resize(parameters.size());
+
 
     for (size_t i = 0; i < initialParameters.size(); ++i) {
         auto foundBlob = factory.paramToBlob.find(i);
 
-        if (foundBlob != factory.paramToBlob.end()) {
-            if (parameters[foundBlob->second] != initialParameters[i]) {
-                reducedParameter[foundBlob->second].push_back(initialParameters[i]);
-            }
-            parameterToIndex[initialParameters[i]] = foundBlob->second;
-        }
-        else {
+        if (foundBlob == factory.paramToBlob.end()) {
             parameters.push_back(initialParameters[i]);
             parameterToIndex[initialParameters[i]] = parameters.size() - 1;
         }
@@ -307,7 +324,9 @@ Substitution::Substitution(const std::vector<double*>& initialParameters,
         parameterVals.push_back(*parameter);
     }
     for (auto paramAndIndex : parameterToIndex) {
-        parameterToVal[paramAndIndex.first] = &parameterVals[paramAndIndex.second];
+        if (paramAndIndex.second > 0) {
+            parameterToVal[paramAndIndex.first] = &parameterVals[paramAndIndex.second];
+        }
     }
 
     for (size_t i = 0; i < attempts.size(); ++i) {
@@ -330,6 +349,14 @@ void Substitution::apply()
     for (size_t r = 0; r < reducedParameter.size(); ++r) {
         for (size_t p = 0; p < reducedParameter[r].size(); ++p) {
             *reducedParameter[r][p] = *parameters[r];
+        }
+    }
+}
+void Substitution::applyConst()
+{
+    for (auto constSet : constParams) {
+        for (auto param : constSet.first) {
+            *param = constSet.second;
         }
     }
 }

@@ -56,12 +56,16 @@ struct Substitution
 
     std::vector<double> parameterVals;  // For every parameter in the substitution, a value whose
                                         // pointer can be passed to subsystems for solving
+
+    std::vector<std::pair<std::vector<double*>, double>> constParams;
+
     Substitution(const std::vector<double*>& initialParameters,
                  const std::vector<Constraint*>& constraints,
                  const UMAP_pD_I& paramToIndex);
     Substitution() = default;
 
     void apply();
+    void applyConst();
 };
 
 }  // namespace GCS

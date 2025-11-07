@@ -57,7 +57,7 @@ struct Substitution
     std::vector<double> parameterVals;  // For every parameter in the substitution, a value whose
                                         // pointer can be passed to subsystems for solving
 
-    std::vector<std::pair<std::vector<double*>, double>> constParams;
+    std::vector<std::pair<std::vector<double*>, double*>> constParams;
 
     Substitution(const std::vector<double*>& initialParameters,
                  const std::vector<Constraint*>& constraints,

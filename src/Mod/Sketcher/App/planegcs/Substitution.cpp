@@ -41,7 +41,7 @@ namespace GCS
 struct SubstitutionBlob
 {
     std::vector<int> parameters;
-    std::optional<double> constValue;
+    std::optional<double*> constValue;
 
     void add(int param)
     {
@@ -120,7 +120,7 @@ struct SubstitutionFactory
         return foundA != paramToBlob.end() && foundB != paramToBlob.end()
             && foundA->second == foundB->second;
     }
-    bool addConst(int param, double value)
+    bool addConst(int param, double* value)
     {
         auto foundParam = paramToBlob.find(param);
 
@@ -176,11 +176,11 @@ ConstraintSubstitutionAttempt substitutionForEqual(Constraint* constr,
     const auto foundP2 = paramToIndex.find(constr->params()[1]);
 
     if (foundP1 == paramToIndex.end() && foundP2 != paramToIndex.end()) {
-        factory.addConst(foundP2->second, *constr->params()[0]);
+        factory.addConst(foundP2->second, constr->params()[0]);
         return ConstraintSubstitutionAttempt::Yes;
     }
-    if (foundP1 == paramToIndex.end() && foundP2 != paramToIndex.end()) {
-        factory.addConst(foundP2->second, *constr->params()[0]);
+    if (foundP1 != paramToIndex.end() && foundP2 == paramToIndex.end()) {
+        factory.addConst(foundP1->second, constr->params()[1]);
         return ConstraintSubstitutionAttempt::Yes;
     }
 
@@ -324,7 +324,7 @@ Substitution::Substitution(const std::vector<double*>& initialParameters,
         parameterVals.push_back(*parameter);
     }
     for (auto paramAndIndex : parameterToIndex) {
-        if (paramAndIndex.second > 0) {
+        if (paramAndIndex.second >= 0) {
             parameterToVal[paramAndIndex.first] = &parameterVals[paramAndIndex.second];
         }
     }
@@ -356,7 +356,7 @@ void Substitution::applyConst()
 {
     for (auto constSet : constParams) {
         for (auto param : constSet.first) {
-            *param = constSet.second;
+            *param = *constSet.second;
         }
     }
 }

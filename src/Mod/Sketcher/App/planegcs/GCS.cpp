@@ -1917,7 +1917,6 @@ int System::solve(bool isFine, Algorithm alg, bool isRedundantsolving)
         return Failed;
     }
 
-    substitution.applyConst();
     bool isReset = false;
     // return success by default in order to permit coincidence constraints to be applied
     // even if no other system has to be solved
@@ -1925,6 +1924,7 @@ int System::solve(bool isFine, Algorithm alg, bool isRedundantsolving)
     for (int cid = 0; cid < int(subSystems.size()); cid++) {
         if ((subSystems[cid] || subSystemsAux[cid]) && !isReset) {
             resetToReference();
+            substitution.applyConst();
             isReset = true;
         }
         if (subSystems[cid] && subSystemsAux[cid]) {

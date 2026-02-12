@@ -3875,8 +3875,6 @@ void ViewProviderSketch::unsetEdit(int ModNum)
     auto gridnode = getGridNode();
     pcRoot->removeChild(gridnode);
 
-    Workbench::leaveEditMode();
-
     if (listener) {
         Gui::getMainWindow()->removeEventFilter(listener.get());
         listener.reset();

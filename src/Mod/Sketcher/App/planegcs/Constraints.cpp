@@ -3229,4 +3229,80 @@ void ConstraintArcLength::evaluate()
     *distance() = (endA - startA) * *arc.rad;
 }
 
+ConstraintRigidIsland::ConstraintRigidIsland(LCS lcs, Point& pt)
+    : lcs(lcs)
+    , point(pt)
+{
+    double diffX = *point.x - *lcs.x;
+    double diffY = *point.y - *lcs.y;
+
+    double cosT = cos(-*lcs.theta);
+    double sinT = sin(-*lcs.theta);
+
+    distanceX = (diffX * cosT) - (diffY * sinT);
+    distanceY = (diffX * sinT) + (diffY * cosT);
+
+    lcs.PushOwnParams(pvec);
+    point.PushOwnParams(pvec);
+    origpvec = pvec;
+    reconstructGeomPointers();
+    rescale();
+}
+void ConstraintRigidIsland::reconstructGeomPointers()
+{
+    int i = 0;
+    lcs.ReconstructOnNewPvec(pvec, i);
+    point.ReconstructOnNewPvec(pvec, i);
+}
+
+ConstraintType ConstraintRigidIsland::getTypeId()
+{
+    return RigidIsland;
+}
+double ConstraintRigidIsland::error()
+{
+    double targetX = (distanceX * cos(*lcs.theta)) - (distanceY * sin(*lcs.theta)) + (*lcs.x);
+    double targetY = (distanceX * sin(*lcs.theta)) + (distanceY * cos(*lcs.theta)) + (*lcs.y);
+
+    return sqrt(pow(targetX - *point.x, 2) + pow(targetY - *point.y, 2));
+}
+double ConstraintRigidIsland::grad(double* param)
+{
+    double cosT = cos(*lcs.theta);
+    double sinT = sin(*lcs.theta);
+    double err = error();
+    if (err == 0.0) {
+        return 0.0;
+    }
+
+    if (param == lcs.x) {
+        return ((*lcs.x) + (distanceX * cosT) - (distanceY * sinT) - (*point.x)) / err;
+    }
+    if (param == lcs.y) {
+        return ((*lcs.y) + (distanceX * sinT) - (distanceY * cosT) - (*point.y)) / err;
+    }
+    if (param == lcs.theta) {
+        return -((((distanceY * (*lcs.y - *point.y)) + (distanceX * (*lcs.x - *point.x))) * sinT)
+                 - (((distanceX * (*point.y - *lcs.y)) - (distanceY * (*lcs.x - *point.x))) * cosT))
+            / error();
+    }
+    if (param == point.x) {
+        return ((*point.x) - (*lcs.x) - (distanceX * cosT) + (distanceY * sinT)) / err;
+    }
+    if (param == point.y) {
+        return (-(*point.y) + (*lcs.y) + (distanceX * sinT) + (distanceY * cosT)) / err;
+    }
+
+    return 0.0;
+}
+void ConstraintRigidIsland::apply()
+{
+    double targetX = (distanceX * cos(*lcs.theta)) - (distanceY * sin(*lcs.theta)) + (*lcs.x);
+    double targetY = (distanceX * sin(*lcs.theta)) + (distanceY * cos(*lcs.theta)) + (*lcs.y);
+
+    *point.x = targetX;
+    *point.y = targetY;
+}
+
+
 }  // namespace GCS

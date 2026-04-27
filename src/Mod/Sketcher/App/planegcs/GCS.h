@@ -400,6 +400,7 @@ public:
         int tagId = 0,
         bool driving = true
     );
+    int addConstraintRigidIsland(LCS lcs, Point& pt, int tagId = 0, bool driving = true);
 
     // derived constraints
     int addConstraintP2PCoincident(Point& p1, Point& p2, int tagId = 0, bool driving = true);

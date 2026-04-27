@@ -53,6 +53,53 @@ void Point::ReconstructOnNewPvec(VEC_pD& pvec, int& cnt)
     cnt++;
 }
 
+//----------------LCS
+LCS::LCS(double* px, double* py, double* ptheta)
+    : x(px)
+    , y(py)
+    , theta(ptheta)
+{
+}
+
+int LCS::PushOwnParams(VEC_pD& pvec) const
+{
+    int cnt = 0;
+    pvec.push_back(x);
+    cnt++;
+    pvec.push_back(y);
+    cnt++;
+    pvec.push_back(theta);
+    cnt++;
+    return cnt;
+}
+void LCS::ReconstructOnNewPvec(VEC_pD& pvec, int& cnt)
+{
+    x = pvec[cnt];
+    cnt++;
+    y = pvec[cnt];
+    cnt++;
+    theta = pvec[cnt];
+    cnt++;
+}
+
+LCSStack::LCSStack(VEC_P points)
+{
+    double sum_x = 0;
+    double sum_y = 0;
+
+    for (auto point: points) {
+        sum_x += *point.x;
+        sum_y += *point.y;
+    }
+    x = sum_x / static_cast<double>(points.size());
+    y = sum_y / static_cast<double>(points.size());
+}
+
+LCS LCSStack::makeLCS()
+{
+    return LCS(&x, &y, &theta);
+}
+
 //----------------DeriVector2
 DeriVector2::DeriVector2(const Point& p, const double* derivparam)
     : x(*p.x)

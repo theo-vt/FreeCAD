@@ -868,6 +868,13 @@ int System::addConstraintTangentAtBSplineKnot(
     constr->setDriving(driving);
     return addConstraint(constr);
 }
+int System::addConstraintRigidIsland(LCS lcs, Point& pt, int tagId, bool driving)
+{
+    Constraint* constr = new ConstraintRigidIsland(lcs, pt);
+    constr->setTag(tagId);
+    constr->setDriving(driving);
+    return addConstraint(constr);
+}
 
 int System::addConstraintC2CDistance(
     Circle& c1,
@@ -2320,6 +2327,9 @@ int System::solve_DL(SubSystem* subsys, bool isRedundantsolving)
     subsys->calcResidual(fx, err);
     subsys->calcJacobi(Jx);
 
+    std::cerr<<"fx: \n"<<fx<<"\n";
+    std::cerr << "Jx: \n" << Jx << "\n";
+
     g = Jx.transpose() * (-fx);
 
     // get the infinity norm fx_inf and g_inf
@@ -2417,6 +2427,8 @@ int System::solve_DL(SubSystem* subsys, bool isRedundantsolving)
         subsys->setParams(x_new);
         subsys->calcResidual(fx_new, err_new);
         subsys->calcJacobi(Jx_new);
+        std::cerr<<"fx: \n"<<fx_new<<"\n";
+        std::cerr << "Jx: \n" << Jx_new << "\n";
 
         // calculate the linear model and the update ratio
         double dL = err - 0.5 * (fx + Jx * h_dl).squaredNorm();

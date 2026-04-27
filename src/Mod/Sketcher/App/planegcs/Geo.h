@@ -55,6 +55,35 @@ public:
 
 using VEC_P = std::vector<Point>;
 
+
+// LCS is a 3DOF entity, it has a position and
+// an angle (radians) from horizontal
+// it is used to constrain points in relation to each other
+class SketcherExport LCS
+{
+public:
+    LCS(double* px, double* py, double* ptheta);
+
+    int PushOwnParams(VEC_pD& pvec) const;
+    void ReconstructOnNewPvec(VEC_pD& pvec, int& cnt);
+
+    double* x{nullptr};
+    double* y{nullptr};
+    double* theta{nullptr};
+};
+class SketcherExport LCSStack 
+{
+public:
+    LCSStack() = default;
+    LCSStack(VEC_P points);
+
+    LCS makeLCS();
+
+    double x{0.0};
+    double y{0.0};
+    double theta {0.0};
+};
+
 /// Class DeriVector2 holds a vector value and its derivative on the
 /// parameter that the derivatives are being calculated for now. x,y is the
 /// actual vector (v). dx,dy is a derivative of the vector by a parameter

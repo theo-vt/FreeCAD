@@ -178,3 +178,197 @@ TEST_F(ConstraintsTest, tangentBSplineAndArc)  // NOLINT
         0.005
     );
 }
+
+TEST_F(ConstraintsTest, rigidIslandUnderConstrainedSolve)  // NOLINT
+{
+    double origx = 0.0;
+    double origy = 0.0;
+    GCS::Point orig(&origx, &origy);
+
+    double p1x = 50;
+    double p1y = 15;
+    GCS::Point p1(&p1x, &p1y);
+
+    double p2x = 75;
+    double p2y = 15;
+    GCS::Point p2(&p2x, &p2y);
+
+    GCS::LCSStack lcsFactory({p1, p2});
+    GCS::LCS lcs = lcsFactory.makeLCS();
+
+    std::vector<double*> params;
+    p1.PushOwnParams(params);
+    p2.PushOwnParams(params);
+    lcs.PushOwnParams(params);
+
+    double p1xpos = 25;
+    double p1ypos = 30;
+    double p2ypos = 30;
+
+    System()->addConstraintRigidIsland(lcs, p1);
+    System()->addConstraintRigidIsland(lcs, p2);
+    System()->addConstraintDifference(orig.x, p1.x, &p1xpos);
+    System()->addConstraintDifference(orig.y, p1.y, &p1ypos);
+    System()->addConstraintDifference(orig.y, p2.y, &p2ypos);
+
+    int solveResult = System()->solve(params);
+    if (solveResult == GCS::Success) {
+        System()->applySolution();
+    }
+
+    // Assert
+    EXPECT_EQ(solveResult, GCS::Success);
+
+    EXPECT_NEAR(p1x, p1xpos, 1e-3);
+    EXPECT_NEAR(p1y, p1ypos, 1e-3);
+    EXPECT_NEAR(p2x, 65.0, 1e-3);
+    EXPECT_NEAR(p2y, p2ypos, 1e-3);
+}
+
+
+TEST_F(ConstraintsTest, rigidIslandSimplestSolveExt)  // NOLINT
+{
+    double origx = 0.0;
+    double origy = 0.0;
+    GCS::Point orig(&origx, &origy);
+
+    double p1x = 50;
+    double p1y = 15;
+    GCS::Point p1(&p1x, &p1y);
+
+    double p2x = 75;
+    double p2y = 15;
+    GCS::Point p2(&p2x, &p2y);
+
+    GCS::LCSStack lcsFactory({p1, p2});
+    GCS::LCS lcs = lcsFactory.makeLCS();
+
+    std::vector<double*> params;
+    p1.PushOwnParams(params);
+    p2.PushOwnParams(params);
+    lcs.PushOwnParams(params);
+
+    double p1xpos = 25;
+    double p1ypos = 30;
+    double p2ypos = 30;
+
+    System()->addConstraintRigidIsland(lcs, p1);
+    System()->addConstraintRigidIsland(lcs, p2);
+    System()->addConstraintDifference(orig.x, p1.x, &p1xpos);
+    System()->addConstraintDifference(orig.y, p1.y, &p1ypos);
+    System()->addConstraintDifference(orig.y, p2.y, &p2ypos);
+
+    int solveResult = System()->solve(params);
+    if (solveResult == GCS::Success) {
+        System()->applySolution();
+    }
+
+    // Assert
+    EXPECT_EQ(solveResult, GCS::Success);
+
+    EXPECT_NEAR(p1x, p1xpos, 1e-3);
+    EXPECT_NEAR(p1y, p1ypos, 1e-3);
+    EXPECT_NEAR(p2x, 65.0, 1e-3);
+    EXPECT_NEAR(p2y, p2ypos, 1e-3);
+}
+
+
+// TEST_F(ConstraintsTest, rigidIslandSolveExt)  // NOLINT
+// {
+//     double origx = 0.0;
+//     double origy = 0.0;
+//     GCS::Point orig(&origx, &origy);
+
+//     double p1x = 50;
+//     double p1y = 15;
+//     GCS::Point p1(&p1x, &p1y);
+
+//     double p2x = 75;
+//     double p2y = 15;
+//     GCS::Point p2(&p2x, &p2y);
+
+//     double p3x = 62.5;
+//     double p3y = 36.6506;
+//     GCS::Point p3(&p3x, &p3y);
+
+//     GCS::LCSStack lcsFactory({p1, p2, p3});
+//     GCS::LCS lcs = lcsFactory.makeLCS();
+
+//     std::vector<double*> params;
+//     p1.PushOwnParams(params);
+//     p2.PushOwnParams(params);
+//     p3.PushOwnParams(params);
+
+//     double p1xpos = 25;
+//     double p1ypos = 30;
+//     double p2ypos = 20;
+
+//     System()->addConstraintRigidIsland(lcs, p1);
+//     System()->addConstraintRigidIsland(lcs, p2);
+//     System()->addConstraintRigidIsland(lcs, p3);
+//     System()->addConstraintDifference(orig.x, p1.x, &p1xpos);
+//     System()->addConstraintDifference(orig.y, p1.y, &p1ypos);
+//     System()->addConstraintDifference(orig.y, p2.y, &p2ypos);
+
+//     int solveResult = System()->solve(params);
+//     if (solveResult == GCS::Success) {
+//         System()->applySolution();
+//     }
+
+//     // Assert
+//     EXPECT_EQ(solveResult, GCS::Success);
+
+//     EXPECT_NEAR(p1x, p1xpos, 1e-3);
+//     EXPECT_NEAR(p1y, p1ypos, 1e-3);
+//     EXPECT_NEAR(p2x, 47.1289, 1e-3);
+//     EXPECT_NEAR(p2y, p2ypos, 1e-3);
+//     EXPECT_NEAR(p3x, 44.8431, 1e-3);
+//     EXPECT_NEAR(p3y, 45.1167, 1e-3);
+// }
+
+TEST_F(ConstraintsTest, rigidIslandApply)  // NOLINT
+{
+    double origx = 0.0;
+    double origy = 0.0;
+    GCS::Point orig(&origx, &origy);
+
+    double p1x = 50;
+    double p1y = 15;
+    GCS::Point p1(&p1x, &p1y);
+
+    double p2x = 75;
+    double p2y = 15;
+    GCS::Point p2(&p2x, &p2y);
+
+    double p3x = 62.5;
+    double p3y = 36.6506;
+    GCS::Point p3(&p3x, &p3y);
+
+    GCS::LCSStack lcs({p1, p2, p3});
+
+    std::vector<double*> params;
+    p1.PushOwnParams(params);
+    p2.PushOwnParams(params);
+    p3.PushOwnParams(params);
+
+
+    auto cstr1 = GCS::ConstraintRigidIsland(lcs.makeLCS(), p1);
+    auto cstr2 = GCS::ConstraintRigidIsland(lcs.makeLCS(), p2);
+    auto cstr3 = GCS::ConstraintRigidIsland(lcs.makeLCS(), p3);
+
+    lcs.x = 39.3432;
+    lcs.y = 31.6144;
+    lcs.theta = 5.871668085;
+
+    cstr1.apply();
+    cstr2.apply();
+    cstr3.apply();
+
+
+    EXPECT_NEAR(p1x, 25.0, 1e-4);
+    EXPECT_NEAR(p1y, 30.0, 1e-4);
+    EXPECT_NEAR(p2x, 47.9129, 1e-4);
+    EXPECT_NEAR(p2y, 20.0, 1e-4);
+    EXPECT_NEAR(p3x, 45.1167, 1e-4);
+    EXPECT_NEAR(p3y, 44.8431, 1e-4);
+}

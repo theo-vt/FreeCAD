@@ -85,6 +85,7 @@ enum ConstraintType
     AngleViaPointAndTwoParams = 34,
     AngleViaTwoPoints = 35,
     ArcLength = 36,
+    RigidIsland = 37,
 };
 
 enum InternalAlignmentType
@@ -1395,6 +1396,29 @@ private:
 public:
     ConstraintArcLength(Arc& a, double* d);
     ConstraintType getTypeId() override;
+};
+
+// Describes a point in an LCS
+// This constraint is special because it can be applied
+// when applied, the LCS is assumed to be fixed and the point
+// position is computed
+class ConstraintRigidIsland: public Constraint 
+{
+private:
+    LCS lcs;
+    Point point;
+    double distanceX, distanceY; // distance of the point to the lcs origin in the lcs axis
+
+public:
+    ConstraintRigidIsland(LCS lcs, Point& pt);
+
+    void reconstructGeomPointers() override;  // writes pointers in pvec to the parameters of a
+
+    ConstraintType getTypeId() override;
+    double error() override;
+    double grad(double*) override;
+
+    void apply();
 };
 
 }  // namespace GCS

@@ -44,13 +44,11 @@ private:
     MAP_pD_pD pmap;  // redirection map from the original parameters to pvals
     VEC_D pvals;     // current variables vector (psize)
                      //        JacobianMatrix jacobi;  // jacobi matrix of the residuals
-    std::map<Constraint*, VEC_pD> c2p;                // constraint to parameter adjacency list
     std::map<double*, std::vector<Constraint*>> p2c;  // parameter to constraint adjacency list
     void initialize(const VEC_pD& params, const MAP_pD_pD& reductionmap);  // called by the constructors
 public:
     SubSystem(const std::vector<Constraint*>& clist_, const VEC_pD& params);
-    SubSystem(const std::vector<Constraint*>& clist_, const VEC_pD& params, const MAP_pD_pD& reductionmap);
-    ~SubSystem();
+    ~SubSystem() = default;
 
     int pSize()
     {
@@ -60,9 +58,6 @@ public:
     {
         return csize;
     };
-
-    void redirectParams();
-    void revertParams();
 
     void getParamMap(MAP_pD_pD& pmapOut);
     void getParamList(VEC_pD& plistOut);

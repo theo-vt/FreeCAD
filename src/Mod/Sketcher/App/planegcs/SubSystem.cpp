@@ -39,18 +39,8 @@ namespace GCS
 SubSystem::SubSystem(const std::vector<Constraint*>& clist_, const VEC_pD& params)
     : clist(clist_)
 {
-    MAP_pD_pD dummymap;
-    initialize(params, dummymap);
+    initialize(params);
 }
-
-SubSystem::SubSystem(const std::vector<Constraint*>& clist_, const VEC_pD& params, const MAP_pD_pD& reductionmap)
-    : clist(clist_)
-{
-    initialize(params, reductionmap);
-}
-
-SubSystem::~SubSystem()
-{}
 
 void SubSystem::initialize(const VEC_pD& params, const MAP_pD_pD& reductionmap)
 {
@@ -91,7 +81,6 @@ void SubSystem::initialize(const VEC_pD& params, const MAP_pD_pD& reductionmap)
         pmap[itr->first] = &pvals[itr->second];
     }
 
-    c2p.clear();
     p2c.clear();
     for (std::vector<Constraint*>::iterator constr = clist.begin(); constr != clist.end(); ++constr) {
         (*constr)->revertParams();  // ensure that the constraint points to the original parameters
@@ -106,31 +95,9 @@ void SubSystem::initialize(const VEC_pD& params, const MAP_pD_pD& reductionmap)
         }
         for (SET_pD::const_iterator p = constr_params.begin(); p != constr_params.end(); ++p) {
             //            jacobi.set(*constr, *p, 0.);
-            c2p[*constr].push_back(*p);
             p2c[*p].push_back(*constr);
         }
         //        (*constr)->redirectParams(pmap); // redirect parameters to pvec
-    }
-}
-
-void SubSystem::redirectParams()
-{
-    // copying values to pvals
-    for (MAP_pD_pD::const_iterator p = pmap.begin(); p != pmap.end(); ++p) {
-        *(p->second) = *(p->first);
-    }
-
-    // redirect constraints to point to pvals
-    for (std::vector<Constraint*>::iterator constr = clist.begin(); constr != clist.end(); ++constr) {
-        (*constr)->revertParams();  // this line will normally not be necessary
-        (*constr)->redirectParams(pmap);
-    }
-}
-
-void SubSystem::revertParams()
-{
-    for (std::vector<Constraint*>::iterator constr = clist.begin(); constr != clist.end(); ++constr) {
-        (*constr)->revertParams();
     }
 }
 

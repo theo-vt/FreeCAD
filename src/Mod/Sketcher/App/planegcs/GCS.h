@@ -114,12 +114,19 @@ private:
 
     VEC_pD pDependentParameters;  // list of dependent parameters by the system
 
+    MAP_pD_pD pmap; // plist to pvals
+    VEC_pD params; // Subset of plist
+    VEC_D pvals; // Parameter values being solved, same size as params
+
+
     // This is a map of primary and secondary identifiers that are found dependent by the solver
     // GCS ignores from a type point
     std::vector<std::vector<double*>> pDependentParametersGroups;
 
     std::vector<Constraint*> clist;
+    std::vector<Constraint*> solveConstraints;
     std::vector<Constraint*> drivenConstraints;
+
     std::map<Constraint*, VEC_pD> c2p;                // constraint to parameter adjacency list
     std::map<double*, std::vector<Constraint*>> p2c;  // parameter to constraint adjacency list
 
@@ -130,9 +137,9 @@ private:
     void setReference();      // copies the current parameter values to reference
     void resetToReference();  // reverts all parameter values to the stored reference
 
-    std::vector<VEC_pD> plists;  // partitioned plist except equality constraints
-    // partitioned clist except equality constraints
-    std::vector<std::vector<Constraint*>> clists;
+    // std::vector<VEC_pD> plists;  // partitioned plist except equality constraints
+    // // partitioned clist except equality constraints
+    // std::vector<std::vector<Constraint*>> clists;
     MAP_pD_pD reductionMap;  // for simplification of equality constraints
 
     int dofs;
@@ -736,7 +743,9 @@ private:
         std::vector<Constraint*> constraints,
         const std::map<double*, double*>& reductionMap
     );
-    IsolateConstraintsOutput isolateConstraints();
+
+    void redirectParams();
+    void revertParams();
 };
 
 

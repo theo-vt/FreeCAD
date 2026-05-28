@@ -1761,8 +1761,21 @@ void System::initSolution(Algorithm alg)
         return;
     }
 
-    auto [redMap, constraints, params] = computeReductionMap(plist, solvableConstraints(clist));
+    auto [redMap, constraints, remParams] = computeReductionMap(plist, solvableConstraints(clist));
+
+    params = remParams;
     reductionMap = redMap;
+    pvals.clear();
+    std::ranges::transform(params, std::back_inserter(pvals), [](double* param) -> double {
+        return *param;
+    });
+
+    for (size_t i = 0; i < params.size(); ++i) {
+        pmap[params[i]] = &pvals[i];
+    }
+    for (auto reduced : reductionMap) {
+        pmap[reduced.first] = pmap[reduced.second];
+    }
 
     auto subSystemDescriptions = partitionIntoSubSystems(params, constraints, reductionMap);
 
@@ -1783,16 +1796,12 @@ void System::initSolution(Algorithm alg)
         if (!clist0.empty()) {
             subSystems[cid] = new SubSystem(
                 subSystemDescription.constraints,
-                subSystemDescription.params,
-                reductionMap
-            );
+                subSystemDescription.params);
         }
         if (!clist1.empty()) {
             subSystemsAux[cid] = new SubSystem(
                 subSystemDescription.constraints,
-                subSystemDescription.params,
-                reductionMap
-            );
+                subSystemDescription.params);
         }
     }
 
@@ -1960,7 +1969,8 @@ std::vector<System::SubSystemDescription> System::partitionIntoSubSystems(
             subSystems.push_back(
                 SubSystemDescription {
                     .constraints = {constraints[i]},
-                    .params = {params[paramAdjIndex - constraints.size()]}
+                    // Subsystems act on pvals, and we assign them to params after a successful solve
+                    .params = {&pvals[paramAdjIndex - constraints.size()]} 
                 }
             );
             removeParam(paramAdjIndex);
@@ -2000,6 +2010,25 @@ std::map<double*, int> System::buildParamToIndex(const std::vector<double*> para
     }
     return paramToIndex;
 }
+void System::redirectParams()
+{
+    // copying values to pvals
+    for (size_t i = 0; i < params.size(); ++i) {
+        pvals[i] = *params[i];
+    }
+
+    // redirect constraints to point to pvals
+    for (auto constr : solveConstraints) {
+        constr->redirectParams(pmap);
+    }
+}
+void System::revertParams()
+{
+    for (auto constr : solveConstraints) {
+        constr->revertParams();
+    }
+}
+
 
 void System::setReference()
 {
@@ -2033,6 +2062,8 @@ int System::solve(bool isFine, Algorithm alg, bool isRedundantsolving)
     if (!isInit) {
         return Failed;
     }
+
+    redirectParams();
 
     bool isReset = false;
     // return success by default in order to permit coincidence constraints to be applied
@@ -2096,8 +2127,6 @@ int System::solve_BFGS(SubSystem* subsys, bool /*isFine*/, bool isRedundantsolvi
     if (xsize == 0) {
         return Success;
     }
-
-    subsys->redirectParams();
 
     Eigen::MatrixXd D = Eigen::MatrixXd::Identity(xsize, xsize);
     Eigen::VectorXd x(xsize);
@@ -2231,8 +2260,6 @@ int System::solve_LM(SubSystem* subsys, bool isRedundantsolving)
     Eigen::MatrixXd J(csize, xsize);  // Jacobi of the subsystem
     Eigen::MatrixXd A(xsize, xsize);
     Eigen::VectorXd x(xsize), h(xsize), x_new(xsize), g(xsize), diag_A(xsize);
-
-    subsys->redirectParams();
 
     subsys->getParams(x);
     subsys->calcResidual(e);
@@ -2438,8 +2465,6 @@ int System::solve_DL(SubSystem* subsys, bool isRedundantsolving)
     Eigen::VectorXd fx(csize), fx_new(csize);
     Eigen::MatrixXd Jx(csize, xsize), Jx_new(csize, xsize);
     Eigen::VectorXd g(xsize), h_sd(xsize), h_gn(xsize), h_dl(xsize);
-
-    subsys->redirectParams();
 
     double err;
     subsys->getParams(x);
@@ -4686,10 +4711,6 @@ int System::solve(SubSystem* subsysA, SubSystem* subsysB, bool /*isFine*/, bool 
     Eigen::VectorXd h(xsize);
     Eigen::VectorXd y(xsize);
     Eigen::VectorXd Bh(xsize);
-
-    // We assume that there are no common constraints in subsysA and subsysB
-    subsysA->redirectParams();
-    subsysB->redirectParams();
 
     subsysB->getParams(plistAB, x);
     subsysA->getParams(plistAB, x);
